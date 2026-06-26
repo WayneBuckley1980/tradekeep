@@ -13,7 +13,11 @@
       "bundleIdentifier": "com.tradekeep.app",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification",
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "plugins": [
@@ -38,9 +42,11 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "replace-with-eas-project-id"
+        "projectId": "f14c110a-fd6f-4575-9d03-bf177604b26f"
       }
-    }
+    },
+    "owner": "wizzard23"
   }
 }
