@@ -18,6 +18,7 @@
       }
     },
     "production": {
+      "autoIncrement": true,
       "ios": {
         "resourceClass": "m-medium"
       }
@@ -26,9 +27,9 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "your-apple-id@example.com",
-        "ascAppId": "replace-with-app-store-connect-id",
-        "appleTeamId": "replace-with-team-id"
+        "appleId": "wayne.buckley@hotmail.co.uk",
+        "ascAppId": "6784760558",
+        "appleTeamId": "W4SXQN72XM"
       }
     }
   }
