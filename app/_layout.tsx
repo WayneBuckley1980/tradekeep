@@ -39,11 +39,19 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="search" options={{ title: 'Search', presentation: 'modal' }} />
         <Stack.Screen name="customer/new" options={{ title: 'Add client', presentation: 'modal' }} />
         <Stack.Screen name="customer/[id]" options={{ title: 'Client' }} />
         <Stack.Screen name="customer/[id]/edit" options={{ title: 'Edit client', presentation: 'modal' }} />
+        <Stack.Screen name="job/new" options={{ title: 'New job', presentation: 'modal' }} />
+        <Stack.Screen name="job/[id]" options={{ title: 'Job' }} />
+        <Stack.Screen name="quote/new" options={{ title: 'New quote', presentation: 'modal' }} />
+        <Stack.Screen name="quote/[id]" options={{ title: 'Quote' }} />
+        <Stack.Screen name="invoice/new" options={{ title: 'New invoice', presentation: 'modal' }} />
+        <Stack.Screen name="invoice/[id]" options={{ title: 'Invoice' }} />
         <Stack.Screen name="paywall" options={{ title: 'Upgrade', presentation: 'modal' }} />
       </Stack>
     </AuthProvider>

@@ -57,14 +57,6 @@ export default function ClientsScreen() {
   const filtered = filterCustomers(customers, query);
   const sections = groupCustomers(filtered);
 
-  const handleAdd = () => {
-    if (!isPro && customers.length >= FREE_TIER_LIMIT) {
-      router.push({ pathname: '/paywall', params: { reason: 'Free plan includes 10 clients.' } });
-      return;
-    }
-    router.push('/customer/new');
-  };
-
   if (loading) {
     return (
       <View style={styles.center}>
@@ -76,7 +68,9 @@ export default function ClientsScreen() {
   return (
     <View style={[styles.container, isWide && styles.containerWide]}>
       <View style={[styles.main, isWide && styles.mainWide]}>
-        <SearchBar value={query} onChangeText={setQuery} />
+        <Pressable onPress={() => router.push('/search')}>
+          <SearchBar value={query} onChangeText={setQuery} placeholder="Search name, phone, notes…" />
+        </Pressable>
 
         {!isPro ? (
           <Text style={styles.limit}>
@@ -102,42 +96,18 @@ export default function ClientsScreen() {
             />
           }
         />
-
-        <Pressable style={styles.fab} onPress={handleAdd}>
-          <Text style={styles.fabText}>+ Add client</Text>
-        </Pressable>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  containerWide: {
-    alignItems: 'center',
-  },
-  main: {
-    flex: 1,
-    width: '100%',
-  },
-  mainWide: {
-    maxWidth: 720,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-  },
-  limit: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  containerWide: { alignItems: 'center' },
+  main: { flex: 1, width: '100%' },
+  mainWide: { maxWidth: 720 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  limit: { ...typography.caption, color: colors.textSecondary, paddingHorizontal: spacing.md, marginBottom: spacing.sm },
   sectionTitle: {
     ...typography.label,
     color: colors.textSecondary,
@@ -147,23 +117,5 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
-  listContent: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: 100,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: spacing.lg,
-    left: spacing.md,
-    right: spacing.md,
-    backgroundColor: colors.ctaBackground,
-    borderRadius: 12,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  fabText: {
-    ...typography.label,
-    color: colors.ctaText,
-    fontWeight: '700',
-  },
+  listContent: { paddingHorizontal: spacing.md, paddingBottom: 120 },
 });

@@ -115,6 +115,34 @@ export async function updateNotificationIds(
   if (error) throw error;
 }
 
+export async function updateProfile(
+  userId: string,
+  payload: Partial<Pick<Profile, 'business_name' | 'business_phone' | 'business_email'>>,
+): Promise<Profile> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(payload)
+    .eq('id', userId)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function exportUserData(userId: string) {
+  const [customers, jobs, quotes, invoices, payments, tags] = await Promise.all([
+    fetchCustomers(userId),
+    supabase.from('jobs').select('*').eq('user_id', userId).then((r) => r.data ?? []),
+    supabase.from('quotes').select('*').eq('user_id', userId).then((r) => r.data ?? []),
+    supabase.from('invoices').select('*').eq('user_id', userId).then((r) => r.data ?? []),
+    supabase.from('payments').select('*').eq('user_id', userId).then((r) => r.data ?? []),
+    supabase.from('tags').select('*').eq('user_id', userId).then((r) => r.data ?? []),
+  ]);
+
+  return { exportedAt: new Date().toISOString(), customers, jobs, quotes, invoices, payments, tags };
+}
+
 export async function updateSubscriptionTier(
   userId: string,
   tier: Profile['subscription_tier'],

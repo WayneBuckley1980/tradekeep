@@ -13,7 +13,12 @@ export function filterCustomers(customers: Customer[], query: string): Customer[
   return customers.filter(
     (customer) =>
       customer.name.toLowerCase().includes(q) ||
-      (customer.notes ?? '').toLowerCase().includes(q),
+      (customer.notes ?? '').toLowerCase().includes(q) ||
+      (customer.phone ?? '').toLowerCase().includes(q) ||
+      (customer.email ?? '').toLowerCase().includes(q) ||
+      (customer.address_line1 ?? '').toLowerCase().includes(q) ||
+      (customer.city ?? '').toLowerCase().includes(q) ||
+      (customer.next_action ?? '').toLowerCase().includes(q),
   );
 }
 

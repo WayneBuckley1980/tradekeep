@@ -10,6 +10,11 @@ export const colors = {
   borderFocus: 'rgba(255,255,255,0.35)',
   ctaBackground: '#FFFFFF',
   ctaText: '#2A2A2A',
+  statusPaid: '#34C759',
+  statusUpcoming: '#0A84FF',
+  statusWaiting: '#FF9F0A',
+  statusOverdue: '#FF453A',
+  statusCancelled: '#8E8E93',
 } as const;
 
 export const spacing = {

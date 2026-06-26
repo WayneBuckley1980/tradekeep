@@ -24,7 +24,7 @@ export default function SignInScreen() {
     setLoading(true);
     try {
       await signInWithApple();
-      router.replace('/(tabs)');
+      router.replace('/(tabs)/home');
     } catch (error) {
       if ((error as { code?: string }).code === 'ERR_REQUEST_CANCELED') return;
       Alert.alert('Sign in failed', error instanceof Error ? error.message : 'Unknown error');

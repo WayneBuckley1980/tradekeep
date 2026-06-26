@@ -1,0 +1,90 @@
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+
+import { Card } from '@/components/Card';
+import { StatusBadge } from '@/components/StatusBadge';
+import { colors, inputStyle, spacing, typography } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
+import { fetchCustomer } from '@/lib/customers';
+import { effectiveInvoiceStatus, fetchInvoice, updateInvoice } from '@/lib/invoices';
+import { formatMoney } from '@/lib/money';
+import { createPayment } from '@/lib/payments';
+
+export default function InvoiceDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuth();
+  const [invoice, setInvoice] = useState<Awaited<ReturnType<typeof fetchInvoice>>>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!user?.id || !id) return;
+    const inv = await fetchInvoice(user.id, id);
+    setInvoice(inv);
+    if (inv) {
+      const c = await fetchCustomer(user.id, inv.customer_id);
+      setCustomerName(c?.name ?? '');
+      setPaymentAmount(String(inv.amount));
+    }
+  }, [user?.id, id]);
+
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    load().catch(console.error).finally(() => setLoading(false));
+  }, [load]));
+
+  const recordPayment = async () => {
+    if (!user?.id || !invoice) return;
+    const amount = Number(paymentAmount);
+    if (!amount) return;
+    await createPayment(user.id, {
+      customer_id: invoice.customer_id,
+      invoice_id: invoice.id,
+      job_id: invoice.job_id,
+      amount,
+      paid_at: new Date().toISOString(),
+      method: 'bank',
+      notes: null,
+    });
+    await updateInvoice(user.id, invoice.id, { status: 'paid' });
+    Alert.alert('Payment recorded', 'Invoice marked as paid.');
+    load();
+  };
+
+  if (loading || !invoice) return <View style={styles.center}><ActivityIndicator color={colors.textPrimary} /></View>;
+
+  const status = effectiveInvoiceStatus(invoice);
+
+  return (
+    <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{invoice.title}</Text>
+        <StatusBadge label={status} status={status} />
+      </View>
+      <Text style={styles.meta}>{invoice.reference} · {customerName}</Text>
+      <Text style={styles.amount}>{formatMoney(Number(invoice.amount))}</Text>
+
+      <Card style={styles.card}>
+        <Text style={styles.label}>Record payment</Text>
+        <TextInput style={styles.input} value={paymentAmount} onChangeText={setPaymentAmount} keyboardType="decimal-pad" placeholder="Amount" placeholderTextColor={colors.textMuted} />
+        <Pressable style={styles.btn} onPress={recordPayment}><Text style={styles.btnText}>Mark paid</Text></Pressable>
+      </Card>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  content: { padding: spacing.md },
+  header: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+  title: { ...typography.title, color: colors.textPrimary, flex: 1, fontSize: 22 },
+  meta: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
+  amount: { ...typography.heading, color: colors.textPrimary, marginVertical: spacing.md },
+  card: { marginBottom: spacing.md },
+  label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.sm },
+  input: { ...inputStyle, marginBottom: spacing.sm },
+  btn: { backgroundColor: colors.ctaBackground, borderRadius: 12, padding: spacing.md, alignItems: 'center' },
+  btnText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
+});
