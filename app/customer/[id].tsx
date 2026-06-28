@@ -17,28 +17,38 @@ import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 import { UrgencyBanner } from '@/components/UrgencyBanner';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTerminology } from '@/hooks/useTerminology';
+import { COMM_TYPES, fetchCommunicationLogs, logCommunication } from '@/lib/communication';
 import { deleteCustomer, fetchCustomer, updateCustomer } from '@/lib/customers';
+import { getCustomerHealth, healthLabel, ratingStars } from '@/lib/customerHealth';
 import { formatDisplayDate, formatRelativeDate } from '@/lib/dates';
 import { fetchInvoicesForCustomer } from '@/lib/invoices';
 import { fetchJobsForCustomer } from '@/lib/jobs';
 import { fetchCustomerSummary, formatMoney } from '@/lib/money';
+import {
+  cancelNotificationIds,
+} from '@/lib/notifications';
 import { fetchPaymentsForCustomer } from '@/lib/payments';
 import { fetchQuotesForCustomer } from '@/lib/quotes';
 import { formatAddress } from '@/lib/search';
 import { buildCustomerTimeline } from '@/lib/timeline';
-import {
-  cancelNotificationIds,
-  ensureNotificationPermissions,
-  scheduleFollowUpNotifications,
-} from '@/lib/notifications';
-import type { Customer, TimelineEntry } from '@/types/database';
+import { ensurePrimaryProperty, fetchPropertiesForCustomer, groupJobsByProperty } from '@/lib/properties';
+import { ClientDocumentsSection } from '@/components/ClientDocumentsSection';
+import { EquipmentSection } from '@/components/EquipmentSection';
+import { PropertyHistorySection } from '@/components/PropertyHistorySection';
+import type { CommunicationLog, Customer, CustomerHealth, TimelineEntry } from '@/types/database';
+import type { PropertyJobGroup } from '@/lib/properties';
 
 export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
+  const terms = useTerminology();
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [health, setHealth] = useState<CustomerHealth | null>(null);
   const [summary, setSummary] = useState({ totalSpent: 0, balanceOwing: 0, lastJobTitle: null as string | null, lastJobDate: null as string | null });
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [commLogs, setCommLogs] = useState<CommunicationLog[]>([]);
+  const [propertyGroups, setPropertyGroups] = useState<PropertyJobGroup[]>([]);
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -52,15 +62,22 @@ export default function CustomerDetailScreen() {
     }
     setCustomer(data);
     setNotes(data.notes ?? '');
-    const [jobs, quotes, invoices, payments, sum] = await Promise.all([
+    const [jobs, quotes, invoices, payments, sum, logs, healthData] = await Promise.all([
       fetchJobsForCustomer(user.id, id),
       fetchQuotesForCustomer(user.id, id),
       fetchInvoicesForCustomer(user.id, id),
       fetchPaymentsForCustomer(user.id, id),
       fetchCustomerSummary(user.id, id),
+      fetchCommunicationLogs(user.id, id),
+      getCustomerHealth(user.id, data),
     ]);
     setSummary(sum);
+    setHealth(healthData);
+    setCommLogs(logs);
     setTimeline(buildCustomerTimeline(jobs, quotes, invoices, payments, data));
+    await ensurePrimaryProperty(user.id, data);
+    const properties = await fetchPropertiesForCustomer(user.id, id);
+    setPropertyGroups(groupJobsByProperty(jobs, properties));
   }, [user?.id, id]);
 
   useFocusEffect(
@@ -81,6 +98,35 @@ export default function CustomerDetailScreen() {
     } finally {
       setSavingNotes(false);
     }
+  };
+
+  const setRating = async (rating: number) => {
+    if (!user?.id || !customer) return;
+    const updated = await updateCustomer(user.id, customer.id, { rating });
+    setCustomer(updated);
+    setHealth(await getCustomerHealth(user.id, updated));
+  };
+
+  const handleLogComm = async (type: typeof COMM_TYPES[number]['id']) => {
+    if (!user?.id || !customer) return;
+    await logCommunication(user.id, customer.id, type);
+    setCommLogs(await fetchCommunicationLogs(user.id, customer.id));
+    const refreshed = await fetchCustomer(user.id, customer.id);
+    if (refreshed) setCustomer(refreshed);
+  };
+
+  const handleArchive = async () => {
+    if (!user?.id || !customer) return;
+    Alert.alert('Archive client', 'Hide from your active list? You can restore later.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Archive',
+        onPress: async () => {
+          await updateCustomer(user.id, customer.id, { archived_at: new Date().toISOString() });
+          router.back();
+        },
+      },
+    ]);
   };
 
   const handleDelete = () => {
@@ -122,8 +168,35 @@ export default function CustomerDetailScreen() {
     <KeyboardSafeScroll contentContainerStyle={styles.content} bottomInset={200} wrapStyle={styles.container}>
       <UrgencyBanner followUpAt={customer.follow_up_at} customerName={customer.name} />
 
-      <Text style={styles.name}>{customer.is_favourite ? `⭐ ${customer.name}` : customer.name}</Text>
+      <Text style={styles.name}>
+        {customer.is_favourite ? `⭐ ${customer.name}` : customer.name}
+        {customer.rating ? ` ${ratingStars(customer.rating)}` : ''}
+      </Text>
       <ContactActions customer={customer} />
+
+      {health ? (
+        <Card style={styles.card}>
+          <Text style={[styles.healthBadge, health.isVip && styles.vip, health.isInactive && styles.inactive]}>
+            {healthLabel(health)}
+          </Text>
+          <Text style={styles.value}>Customer since: {health.customerSince}</Text>
+          <Text style={styles.value}>
+            Last {terms.job.toLowerCase()}: {health.lastJobTitle ?? health.lastJobDate ?? 'None'}
+            {health.lastJobDate && !health.lastJobTitle ? ` (${formatRelativeDate(health.lastJobDate)})` : ''}
+          </Text>
+          <Text style={styles.value}>Lifetime spend: {formatMoney(health.lifetimeSpend)}</Text>
+          <Text style={styles.value}>{terms.jobs}: {health.jobCount}</Text>
+          <Text style={styles.value}>Outstanding: {formatMoney(health.outstanding)}</Text>
+          {health.suggestFollowUp ? (
+            <Pressable
+              style={styles.followUpBtn}
+              onPress={() => router.push({ pathname: '/customer/[id]/edit', params: { id: customer.id } })}
+            >
+              <Text style={styles.followUpText}>Suggest follow up</Text>
+            </Pressable>
+          ) : null}
+        </Card>
+      ) : null}
 
       {customer.next_action ? (
         <Card style={styles.card}>
@@ -136,23 +209,54 @@ export default function CustomerDetailScreen() {
       ) : null}
 
       <Card style={styles.card}>
-        <Text style={styles.label}>Contact</Text>
-        {customer.phone ? <Text style={styles.value}>{customer.phone}</Text> : null}
-        {customer.email ? <Text style={styles.value}>{customer.email}</Text> : null}
-        {address ? <Text style={styles.value}>{address}</Text> : null}
+        <Text style={styles.label}>Private rating</Text>
+        <View style={styles.ratingRow}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <Pressable key={n} onPress={() => setRating(n)}>
+              <Text style={styles.star}>{(customer.rating ?? 0) >= n ? '★' : '☆'}</Text>
+            </Pressable>
+          ))}
+        </View>
       </Card>
 
       <Card style={styles.card}>
-        <Text style={styles.label}>Summary</Text>
-        <Text style={styles.value}>Total spent: {formatMoney(summary.totalSpent)}</Text>
-        <Text style={styles.value}>Balance owing: {formatMoney(summary.balanceOwing)}</Text>
-        <Text style={styles.meta}>
-          Last job: {summary.lastJobTitle ?? customer.last_appointment ? (summary.lastJobTitle ?? formatRelativeDate(customer.last_appointment)) : 'None'}
-        </Text>
+        <Text style={styles.label}>Communication log</Text>
+        {customer.last_contacted_at ? (
+          <Text style={styles.meta}>Last contacted {formatRelativeDate(customer.last_contacted_at)}</Text>
+        ) : (
+          <Text style={styles.meta}>No contact logged yet</Text>
+        )}
+        <View style={styles.commRow}>
+          {COMM_TYPES.slice(0, 5).map((t) => (
+            <Pressable key={t.id} style={styles.commChip} onPress={() => handleLogComm(t.id)}>
+              <Text style={styles.commText}>{t.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {commLogs.slice(0, 5).map((log) => (
+          <Text key={log.id} style={styles.meta}>
+            {log.type} · {new Date(log.logged_at).toLocaleDateString('en-GB')}
+          </Text>
+        ))}
       </Card>
 
+      {address ? (
+        <Card style={styles.card}>
+          <Text style={styles.label}>Property</Text>
+          <Text style={styles.value}>{address}</Text>
+        </Card>
+      ) : null}
+
+      {user?.id ? (
+        <>
+          <PropertyHistorySection groups={propertyGroups} jobLabel={terms.job} />
+          <EquipmentSection userId={user.id} customerId={customer.id} />
+          <ClientDocumentsSection userId={user.id} customerId={customer.id} />
+        </>
+      ) : null}
+
       <Card style={styles.card}>
-        <Text style={styles.label}>Notes / preferences</Text>
+        <Text style={styles.label}>{terms.siteNotes}</Text>
         <TextInput
           style={[styles.notesInput, inputStyle]}
           value={notes}
@@ -192,13 +296,19 @@ export default function CustomerDetailScreen() {
 
       <View style={styles.actions}>
         <Pressable style={styles.btn} onPress={() => router.push(`/customer/${customer.id}/edit`)}>
-          <Text style={styles.btnText}>Edit client</Text>
+          <Text style={styles.btnText}>Edit</Text>
         </Pressable>
         <Pressable style={styles.btnSecondary} onPress={() => router.push({ pathname: '/job/new', params: { customerId: customer.id } })}>
-          <Text style={styles.btnSecondaryText}>+ Job</Text>
+          <Text style={styles.btnSecondaryText}>+ {terms.job}</Text>
+        </Pressable>
+        <Pressable style={styles.btnSecondary} onPress={() => router.push({ pathname: '/quote/new', params: { customerId: customer.id } })}>
+          <Text style={styles.btnSecondaryText}>+ {terms.quote}</Text>
         </Pressable>
       </View>
 
+      <Pressable onPress={handleArchive}>
+        <Text style={styles.archive}>Archive client</Text>
+      </Pressable>
       <Pressable onPress={handleDelete}>
         <Text style={styles.delete}>Delete client</Text>
       </Pressable>
@@ -217,7 +327,17 @@ const styles = StyleSheet.create({
   meta: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
   body: { ...typography.body, color: colors.textPrimary },
   link: { ...typography.body, color: colors.textSecondary, marginTop: spacing.md },
-  notesInput: { marginTop: spacing.sm, minHeight: 120, textAlignVertical: 'top' },
+  healthBadge: { ...typography.label, color: colors.textPrimary, fontWeight: '700', marginBottom: spacing.sm },
+  vip: { color: '#FFD700' },
+  inactive: { color: colors.statusOverdue },
+  followUpBtn: { marginTop: spacing.md, backgroundColor: colors.surfaceElevated, borderRadius: 8, padding: spacing.sm, alignItems: 'center' },
+  followUpText: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
+  ratingRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  star: { fontSize: 28, color: '#FFD700' },
+  commRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm, marginBottom: spacing.sm },
+  commChip: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  commText: { ...typography.caption, color: colors.textPrimary },
+  notesInput: { marginTop: spacing.sm, minHeight: 100, textAlignVertical: 'top' },
   sectionTitle: { ...typography.label, color: colors.textSecondary, marginBottom: spacing.sm, textTransform: 'uppercase' },
   timelineCard: { marginBottom: spacing.sm },
   timelineType: { ...typography.caption, color: colors.textMuted, textTransform: 'uppercase' },
@@ -225,6 +345,7 @@ const styles = StyleSheet.create({
   btn: { flex: 1, backgroundColor: colors.ctaBackground, borderRadius: 12, paddingVertical: spacing.md, alignItems: 'center' },
   btnText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
   btnSecondary: { flex: 1, borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 12, paddingVertical: spacing.md, alignItems: 'center' },
-  btnSecondaryText: { ...typography.label, color: colors.textPrimary, fontWeight: '600' },
+  btnSecondaryText: { ...typography.label, color: colors.textPrimary, fontWeight: '600', fontSize: 12 },
+  archive: { ...typography.body, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm },
   delete: { ...typography.body, color: colors.statusOverdue, textAlign: 'center' },
 });

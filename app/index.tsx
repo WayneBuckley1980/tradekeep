@@ -5,9 +5,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/constants/theme';
 
 export default function Index() {
-  const { session, loading } = useAuth();
+  const { session, loading, profile } = useAuth();
 
-  if (loading) {
+  if (loading || (session && !profile)) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={colors.textPrimary} />
@@ -16,6 +16,9 @@ export default function Index() {
   }
 
   if (session) {
+    if (profile && !profile.onboarding_completed) {
+      return <Redirect href={'/onboarding' as never} />;
+    }
     return <Redirect href="/(tabs)/home" />;
   }
 

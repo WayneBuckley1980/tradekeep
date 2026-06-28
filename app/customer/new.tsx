@@ -30,6 +30,12 @@ function toPayload(values: CustomerFormValues) {
     amount_paid: parseAmount(values.amount_paid),
     follow_up_at: values.follow_up_at,
     notification_ids: null,
+    rating: null,
+    archived_at: null,
+    last_contacted_at: null,
+    lead_id: null,
+    reminder_type: values.reminder_type,
+    reminder_offset_days: values.reminder_type === 'days_after_install' ? Number(values.reminder_offset_days) || null : null,
   };
 }
 
@@ -48,10 +54,17 @@ export default function NewCustomerScreen() {
 
     let customer = await createCustomer(user.id, toPayload(values));
 
-    if (values.follow_up_at) {
+    if (values.follow_up_at || values.reminder_type !== 'fixed_date') {
       const granted = await ensureNotificationPermissions();
       if (granted) {
-        const notification_ids = await scheduleFollowUpNotifications(customer);
+        const notification_ids = await scheduleFollowUpNotifications({
+          id: customer.id,
+          name: customer.name,
+          follow_up_at: customer.follow_up_at,
+          reminder_type: customer.reminder_type,
+          reminder_offset_days: customer.reminder_offset_days,
+          last_appointment: customer.last_appointment,
+        });
         customer = await updateCustomer(user.id, customer.id, { notification_ids });
       }
     }

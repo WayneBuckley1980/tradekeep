@@ -15,7 +15,8 @@ import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { formatDateOnly, parseDateOnly } from '@/lib/dates';
-import type { Customer } from '@/types/database';
+import { REMINDER_PRESETS, computeFollowUpDate } from '@/lib/reminders';
+import type { Customer, ReminderType } from '@/types/database';
 
 export type CustomerFormValues = {
   name: string;
@@ -32,6 +33,8 @@ export type CustomerFormValues = {
   last_appointment: string | null;
   amount_paid: string;
   follow_up_at: string | null;
+  reminder_type: ReminderType;
+  reminder_offset_days: string;
 };
 
 type CustomerFormProps = {
@@ -56,6 +59,8 @@ function toFormValues(initial?: Partial<Customer>): CustomerFormValues {
     last_appointment: initial?.last_appointment ?? null,
     amount_paid: initial?.amount_paid != null ? String(initial.amount_paid) : '',
     follow_up_at: initial?.follow_up_at ?? null,
+    reminder_type: initial?.reminder_type ?? 'fixed_date',
+    reminder_offset_days: initial?.reminder_offset_days != null ? String(initial.reminder_offset_days) : '365',
   };
 }
 
@@ -165,6 +170,54 @@ export function CustomerForm({ initial, onSubmit, submitLabel = 'Save client' }:
 
       {renderDateField('Follow-up reminder', values.follow_up_at, (follow_up_at) => update({ follow_up_at }), 'follow')}
 
+      <View style={styles.field}>
+        <Text style={styles.label}>Reminder type</Text>
+        <View style={styles.chipRow}>
+          {REMINDER_PRESETS.map((preset) => (
+            <Pressable
+              key={preset.id}
+              style={[styles.chip, values.reminder_type === preset.id && styles.chipActive]}
+              onPress={() => {
+                const follow_up_at = computeFollowUpDate(preset.id, {
+                  fixedDate: values.follow_up_at,
+                  offsetDays: Number(values.reminder_offset_days) || null,
+                  referenceDate: values.last_appointment,
+                });
+                update({
+                  reminder_type: preset.id,
+                  follow_up_at: follow_up_at ?? values.follow_up_at,
+                });
+              }}
+            >
+              <Text style={styles.chipText}>{preset.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {values.reminder_type === 'days_after_install' ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Days after install</Text>
+          <TextInput
+            style={styles.input}
+            value={values.reminder_offset_days}
+            onChangeText={(reminder_offset_days) => {
+              const days = Number(reminder_offset_days);
+              update({
+                reminder_offset_days,
+                follow_up_at: computeFollowUpDate('days_after_install', {
+                  offsetDays: Number.isFinite(days) ? days : null,
+                  referenceDate: values.last_appointment,
+                }),
+              });
+            }}
+            keyboardType="number-pad"
+            placeholder="365"
+            placeholderTextColor={colors.textMuted}
+          />
+        </View>
+      ) : null}
+
       <Pressable style={[styles.submit, saving && styles.submitDisabled]} onPress={handleSubmit} disabled={saving}>
         <Text style={styles.submitText}>{saving ? 'Saving…' : submitLabel}</Text>
       </Pressable>
@@ -184,6 +237,10 @@ const styles = StyleSheet.create({
   doneButton: { alignSelf: 'flex-end', marginTop: spacing.xs },
   doneText: { color: colors.textPrimary, fontWeight: '600' },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  chip: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: 6 },
+  chipActive: { borderColor: colors.textPrimary, backgroundColor: colors.surfaceElevated },
+  chipText: { ...typography.caption, color: colors.textPrimary },
   submit: { backgroundColor: colors.ctaBackground, borderRadius: 12, paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.md },
   submitDisabled: { opacity: 0.6 },
   submitText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },

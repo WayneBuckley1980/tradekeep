@@ -87,3 +87,16 @@ export function generateReference(prefix: string): string {
   const n = Date.now().toString(36).toUpperCase();
   return `${prefix}-${n.slice(-6)}`;
 }
+
+export async function duplicateInvoice(userId: string, invoice: Invoice): Promise<Invoice> {
+  return createInvoice(userId, {
+    customer_id: invoice.customer_id,
+    job_id: invoice.job_id,
+    quote_id: invoice.quote_id,
+    reference: generateReference('INV'),
+    title: invoice.title,
+    amount: invoice.amount,
+    status: 'draft',
+    due_at: invoice.due_at,
+  });
+}

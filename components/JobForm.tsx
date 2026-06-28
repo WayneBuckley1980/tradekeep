@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Alert,
   Platform,
@@ -13,7 +13,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { CustomerPicker } from '@/components/CustomerPicker';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
-import type { Customer, JobStatus } from '@/types/database';
+import { fetchJobTemplates } from '@/lib/templates';
+import type { Customer, JobStatus, JobTemplate } from '@/types/database';
 
 export type JobFormValues = {
   customer_id: string;
@@ -40,6 +41,7 @@ type JobFormProps = {
 const STATUSES: JobStatus[] = ['upcoming', 'in_progress', 'completed', 'cancelled'];
 
 export function JobForm({ userId, initial, onSubmit, submitLabel = 'Save job' }: JobFormProps) {
+  const [templates, setTemplates] = useState<JobTemplate[]>([]);
   const [values, setValues] = useState<JobFormValues>({
     customer_id: initial?.customer_id ?? '',
     title: initial?.title ?? '',
@@ -59,6 +61,21 @@ export function JobForm({ userId, initial, onSubmit, submitLabel = 'Save job' }:
   const [showDate, setShowDate] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    fetchJobTemplates(userId).then(setTemplates).catch(console.error);
+  }, [userId]);
+
+  const applyTemplate = (template: JobTemplate) => {
+    setValues((v) => ({
+      ...v,
+      title: template.title,
+      description: template.description ?? v.description,
+      duration_minutes: template.duration_minutes?.toString() ?? v.duration_minutes,
+      materials: template.materials ?? v.materials,
+      price: template.suggested_price?.toString() ?? v.price,
+    }));
+  };
+
   const handleSubmit = async () => {
     if (!values.customer_id || !values.title.trim()) {
       Alert.alert('Required', 'Select a client and enter a job title.');
@@ -77,6 +94,19 @@ export function JobForm({ userId, initial, onSubmit, submitLabel = 'Save job' }:
   return (
     <>
       <KeyboardSafeScroll contentContainerStyle={styles.container} keyboardVerticalOffset={Platform.OS === 'ios' ? 110 : 0}>
+        {templates.length > 0 ? (
+          <View style={styles.templateSection}>
+            <Text style={styles.templateLabel}>Choose template</Text>
+            <View style={styles.templateRow}>
+              {templates.map((t) => (
+                <Pressable key={t.id} style={styles.templateChip} onPress={() => applyTemplate(t)}>
+                  <Text style={styles.templateText}>{t.title}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         <Pressable style={styles.input} onPress={() => setPickerOpen(true)}>
           <Text style={values.customer_id ? styles.inputText : styles.placeholder}>
             {customerName || 'Select client *'}
@@ -138,6 +168,11 @@ export function JobForm({ userId, initial, onSubmit, submitLabel = 'Save job' }:
 
 const styles = StyleSheet.create({
   container: { padding: spacing.md, paddingBottom: spacing.xl },
+  templateSection: { marginBottom: spacing.md },
+  templateLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.sm, textTransform: 'uppercase' },
+  templateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  templateChip: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  templateText: { ...typography.caption, color: colors.textPrimary },
   input: { ...inputStyle, marginBottom: spacing.sm, justifyContent: 'center' },
   inputText: { color: colors.textPrimary, fontSize: 16 },
   placeholder: { color: colors.textMuted, fontSize: 16 },

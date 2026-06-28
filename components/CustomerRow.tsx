@@ -1,10 +1,12 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Linking } from 'react-native';
 import { router } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
 
 import { Card } from '@/components/Card';
 import { colors, radii, spacing, typography } from '@/constants/theme';
 import { followUpLabel, formatRelativeDate, getFollowUpUrgency } from '@/lib/dates';
+import { formatAddress } from '@/lib/search';
 import type { Customer } from '@/types/database';
 
 type CustomerRowProps = {
@@ -46,7 +48,26 @@ export function ContactActions({ customer }: { customer: Customer }) {
   const text = () => customer.phone && Linking.openURL(`sms:${customer.phone}`);
   const email = () => customer.email && Linking.openURL(`mailto:${customer.email}`);
 
-  if (!customer.phone && !customer.email) return null;
+  const address = formatAddress(customer);
+  const navigate = () => {
+    if (!address) return;
+    const encoded = encodeURIComponent(address);
+    Linking.openURL(`https://maps.apple.com/?q=${encoded}`);
+  };
+
+  const copyPhone = async () => {
+    if (!customer.phone) return;
+    await Clipboard.setStringAsync(customer.phone);
+    Alert.alert('Copied', 'Phone number copied.');
+  };
+
+  const copyAddress = async () => {
+    if (!address) return;
+    await Clipboard.setStringAsync(address);
+    Alert.alert('Copied', 'Address copied.');
+  };
+
+  if (!customer.phone && !customer.email && !address) return null;
 
   return (
     <View style={styles.actions}>
@@ -54,10 +75,17 @@ export function ContactActions({ customer }: { customer: Customer }) {
         <>
           <Pressable style={styles.actionBtn} onPress={call}><Text style={styles.actionText}>Call</Text></Pressable>
           <Pressable style={styles.actionBtn} onPress={text}><Text style={styles.actionText}>Text</Text></Pressable>
+          <Pressable style={styles.actionBtn} onPress={copyPhone}><Text style={styles.actionText}>Copy</Text></Pressable>
         </>
       ) : null}
       {customer.email ? (
         <Pressable style={styles.actionBtn} onPress={email}><Text style={styles.actionText}>Email</Text></Pressable>
+      ) : null}
+      {address ? (
+        <>
+          <Pressable style={styles.actionBtn} onPress={navigate}><Text style={styles.actionText}>Navigate</Text></Pressable>
+          <Pressable style={styles.actionBtn} onPress={copyAddress}><Text style={styles.actionText}>Copy addr</Text></Pressable>
+        </>
       ) : null}
     </View>
   );

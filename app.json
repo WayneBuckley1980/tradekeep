@@ -13,7 +13,9 @@
       "bundleIdentifier": "com.tradekeep.app",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"],
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -33,7 +35,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#2A2A2A"
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TradeKeep needs photo library access for before/after job photos and client documents."
+        }
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

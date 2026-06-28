@@ -6,8 +6,9 @@ import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { scheduleAfterPaidReminder, syncCustomerPaidTotal } from '@/lib/automations';
 import { fetchCustomer } from '@/lib/customers';
-import { effectiveInvoiceStatus, fetchInvoice, updateInvoice } from '@/lib/invoices';
+import { duplicateInvoice, effectiveInvoiceStatus, fetchInvoice, updateInvoice } from '@/lib/invoices';
 import { formatMoney } from '@/lib/money';
 import { createPayment } from '@/lib/payments';
 
@@ -49,8 +50,16 @@ export default function InvoiceDetailScreen() {
       notes: null,
     });
     await updateInvoice(user.id, invoice.id, { status: 'paid' });
-    Alert.alert('Payment recorded', 'Invoice marked as paid.');
+    await syncCustomerPaidTotal(user.id, invoice.customer_id);
+    await scheduleAfterPaidReminder(user.id, invoice.customer_id);
+    Alert.alert('Payment recorded', 'Invoice marked as paid. Client balance updated.');
     load();
+  };
+
+  const handleDuplicate = async () => {
+    if (!user?.id || !invoice) return;
+    const dup = await duplicateInvoice(user.id, invoice);
+    router.push(`/invoice/${dup.id}`);
   };
 
   if (loading || !invoice) return <View style={styles.center}><ActivityIndicator color={colors.textPrimary} /></View>;
@@ -71,6 +80,10 @@ export default function InvoiceDetailScreen() {
         <TextInput style={styles.input} value={paymentAmount} onChangeText={setPaymentAmount} keyboardType="decimal-pad" placeholder="Amount" placeholderTextColor={colors.textMuted} />
         <Pressable style={styles.btn} onPress={recordPayment}><Text style={styles.btnText}>Mark paid</Text></Pressable>
       </Card>
+
+      <Pressable style={styles.btnSecondary} onPress={handleDuplicate}>
+        <Text style={styles.btnSecondaryText}>Duplicate invoice</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -87,4 +100,6 @@ const styles = StyleSheet.create({
   input: { ...inputStyle, marginBottom: spacing.sm },
   btn: { backgroundColor: colors.ctaBackground, borderRadius: 12, padding: spacing.md, alignItems: 'center' },
   btnText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
+  btnSecondary: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 12, padding: spacing.md, alignItems: 'center', marginTop: spacing.sm },
+  btnSecondaryText: { ...typography.label, color: colors.textPrimary },
 });

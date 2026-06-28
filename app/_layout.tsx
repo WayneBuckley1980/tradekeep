@@ -39,6 +39,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="auth" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -52,6 +53,8 @@ export default function RootLayout() {
         <Stack.Screen name="quote/[id]" options={{ title: 'Quote' }} />
         <Stack.Screen name="invoice/new" options={{ title: 'New invoice', presentation: 'modal' }} />
         <Stack.Screen name="invoice/[id]" options={{ title: 'Invoice' }} />
+        <Stack.Screen name="lead/new" options={{ title: 'New lead', presentation: 'modal' }} />
+        <Stack.Screen name="lead/[id]" options={{ title: 'Lead' }} />
         <Stack.Screen name="paywall" options={{ title: 'Upgrade', presentation: 'modal' }} />
       </Stack>
     </AuthProvider>

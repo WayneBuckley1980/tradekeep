@@ -4,8 +4,10 @@ import { router } from 'expo-router';
 
 import { CustomerPicker } from '@/components/CustomerPicker';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
+import { QuoteLineItemsForm, useQuoteLineItemsState } from '@/components/QuoteLineItemsForm';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { saveQuoteLineItems } from '@/lib/quoteItems';
 import { createQuote, generateReference } from '@/lib/quotes';
 import type { Customer, QuoteStatus } from '@/types/database';
 
@@ -16,26 +18,43 @@ export default function NewQuoteScreen() {
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [title, setTitle] = useState('');
-  const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<QuoteStatus>('sent');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const { items, setItems, discount, setDiscount } = useQuoteLineItemsState();
 
   const save = async () => {
     if (!user?.id || !customerId || !title.trim()) {
       Alert.alert('Required', 'Select client and enter title.');
       return;
     }
+
+    const lineItems = items
+      .filter((i) => i.label.trim())
+      .map((i) => ({ label: i.label.trim(), amount: Number(i.amount) || 0 }));
+
+    const subtotal = lineItems.reduce((sum, i) => sum + i.amount, 0);
+    const total = Math.max(0, subtotal - (Number(discount) || 0));
+
     const quote = await createQuote(user.id, {
       customer_id: customerId,
       job_id: null,
       reference: generateReference('Q'),
       title: title.trim(),
       description: description.trim() || null,
-      amount: Number(amount) || 0,
+      amount: total,
       status,
       valid_until: null,
     });
+
+    if (lineItems.length > 0) {
+      const rows = [...lineItems];
+      if (Number(discount) > 0) {
+        rows.push({ label: 'Discount', amount: -Number(discount) });
+      }
+      await saveQuoteLineItems(user.id, quote.id, rows);
+    }
+
     router.replace(`/quote/${quote.id}`);
   };
 
@@ -48,7 +67,7 @@ export default function NewQuoteScreen() {
           <Text style={customerId ? styles.text : styles.placeholder}>{customerName || 'Select client *'}</Text>
         </Pressable>
         <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Quote title *" placeholderTextColor={colors.textMuted} />
-        <TextInput style={styles.input} value={amount} onChangeText={setAmount} placeholder="Amount (£) *" placeholderTextColor={colors.textMuted} keyboardType="decimal-pad" />
+        <QuoteLineItemsForm items={items} onChange={setItems} discount={discount} onDiscountChange={setDiscount} />
         <TextInput style={[styles.input, styles.multi]} value={description} onChangeText={setDescription} placeholder="Description" placeholderTextColor={colors.textMuted} multiline />
         <View style={styles.row}>
           {STATUSES.map((s) => (

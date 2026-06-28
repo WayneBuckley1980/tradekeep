@@ -11,6 +11,7 @@ import {
   ensureNotificationPermissions,
   scheduleFollowUpNotifications,
 } from '@/lib/notifications';
+import { computeFollowUpDate } from '@/lib/reminders';
 import type { Customer } from '@/types/database';
 
 function parseAmount(value: string): number | null {
@@ -43,13 +44,23 @@ export default function EditCustomerScreen() {
     await cancelNotificationIds(customer.notification_ids);
 
     let notification_ids = null;
-    if (values.follow_up_at) {
+    const resolvedFollowUp =
+      computeFollowUpDate(values.reminder_type, {
+        fixedDate: values.follow_up_at,
+        offsetDays: Number(values.reminder_offset_days) || null,
+        referenceDate: values.last_appointment,
+      }) ?? values.follow_up_at;
+
+    if (resolvedFollowUp || values.reminder_type !== 'fixed_date') {
       const granted = await ensureNotificationPermissions();
       if (granted) {
         notification_ids = await scheduleFollowUpNotifications({
           id: customer.id,
           name: values.name.trim(),
-          follow_up_at: values.follow_up_at,
+          follow_up_at: resolvedFollowUp,
+          reminder_type: values.reminder_type,
+          reminder_offset_days: Number(values.reminder_offset_days) || null,
+          last_appointment: values.last_appointment,
         });
       }
     }
@@ -68,7 +79,9 @@ export default function EditCustomerScreen() {
       next_action_due_at: values.next_action_due_at,
       last_appointment: values.last_appointment,
       amount_paid: parseAmount(values.amount_paid),
-      follow_up_at: values.follow_up_at,
+      follow_up_at: resolvedFollowUp,
+      reminder_type: values.reminder_type,
+      reminder_offset_days: values.reminder_type === 'days_after_install' ? Number(values.reminder_offset_days) || null : null,
       notification_ids,
     });
 

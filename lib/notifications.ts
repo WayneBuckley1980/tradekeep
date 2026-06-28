@@ -1,13 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-import {
-  daysUntilFollowUp,
-  parseDateOnly,
-  scheduleAtNineAm,
-  startOfDay,
-  subtractDays,
-} from '@/lib/dates';
+import { formatDateOnly, parseDateOnly, scheduleAtNineAm, startOfDay, subtractDays } from '@/lib/dates';
+import { computeFollowUpDate } from '@/lib/reminders';
 import type { Customer, NotificationIds } from '@/types/database';
 
 Notifications.setNotificationHandler({
@@ -57,9 +52,15 @@ export async function cancelNotificationIds(ids: NotificationIds | null | undefi
 }
 
 export async function scheduleFollowUpNotifications(
-  customer: Pick<Customer, 'id' | 'name' | 'follow_up_at'>,
+  customer: Pick<Customer, 'id' | 'name' | 'follow_up_at' | 'reminder_type' | 'reminder_offset_days' | 'last_appointment'>,
 ): Promise<NotificationIds> {
-  const followUp = parseDateOnly(customer.follow_up_at);
+  const followUpStr =
+    computeFollowUpDate(customer.reminder_type ?? 'fixed_date', {
+      fixedDate: customer.follow_up_at,
+      offsetDays: customer.reminder_offset_days,
+      referenceDate: customer.last_appointment,
+    }) ?? customer.follow_up_at;
+  const followUp = parseDateOnly(followUpStr);
   if (!followUp) {
     return {};
   }
@@ -67,7 +68,7 @@ export async function scheduleFollowUpNotifications(
   const ids: NotificationIds = {};
   const today = startOfDay(new Date());
   const followUpDay = startOfDay(followUp);
-  const daysUntil = daysUntilFollowUp(customer.follow_up_at);
+  const daysUntil = Math.round((followUpDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
   const dayOfTrigger = scheduleAtNineAm(followUpDay);
   if (daysUntil !== null && daysUntil >= 0) {
@@ -100,12 +101,24 @@ export async function resyncAllFollowUpNotifications(
   onUpdate: (customerId: string, notification_ids: NotificationIds) => Promise<void>,
 ) {
   for (const customer of customers) {
-    if (!customer.follow_up_at) continue;
-    const days = daysUntilFollowUp(customer.follow_up_at);
-    if (days === null || days < 0) continue;
+    if (!customer.follow_up_at && customer.reminder_type === 'fixed_date') continue;
+    const followUpStr = computeFollowUpDate(customer.reminder_type ?? 'fixed_date', {
+      fixedDate: customer.follow_up_at,
+      offsetDays: customer.reminder_offset_days,
+      referenceDate: customer.last_appointment,
+    });
+    const followUp = parseDateOnly(followUpStr ?? customer.follow_up_at);
+    if (!followUp) continue;
+
+    const today = startOfDay(new Date());
+    const days = Math.round((startOfDay(followUp).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (days < 0) continue;
 
     await cancelNotificationIds(customer.notification_ids);
-    const notification_ids = await scheduleFollowUpNotifications(customer);
+    const notification_ids = await scheduleFollowUpNotifications({
+      ...customer,
+      follow_up_at: formatDateOnly(followUp),
+    });
     await onUpdate(customer.id, notification_ids);
   }
 }

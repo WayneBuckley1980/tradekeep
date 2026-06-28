@@ -127,6 +127,7 @@ export async function duplicateJob(userId: string, job: Job): Promise<Job> {
     materials: job.materials,
     notes: job.notes,
     quote_id: null,
+    property_id: job.property_id,
   });
 }
 

@@ -23,6 +23,7 @@ export default function NewJobScreen() {
       materials: values.materials.trim() || null,
       notes: values.notes.trim() || null,
       quote_id: null,
+      property_id: null,
     });
     await syncLastAppointmentFromJob(user.id, job.customer_id, job);
     router.replace(`/job/${job.id}`);

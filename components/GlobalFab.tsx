@@ -16,6 +16,10 @@ export function GlobalFab({ bottom = 90 }: GlobalFabProps) {
   const showMenu = () => {
     Alert.alert('Quick add', 'What would you like to create?', [
       {
+        text: 'New lead',
+        onPress: () => router.push('/lead/new' as never),
+      },
+      {
         text: 'New client',
         onPress: async () => {
           if (!user?.id) return;

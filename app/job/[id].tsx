@@ -3,15 +3,23 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
+import { AttachmentGallery } from '@/components/AttachmentGallery';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
+import { VoiceNotesSection } from '@/components/VoiceNotesSection';
 import { colors, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchAttachmentsForJob, uploadAttachment } from '@/lib/attachments';
+import {
+  deleteAttachment,
+  fetchAttachmentsForJob,
+  uploadAttachment,
+} from '@/lib/attachments';
+import { createInvoiceFromJob, scheduleAfterJobReminder } from '@/lib/automations';
 import { fetchCustomer } from '@/lib/customers';
 import { createInvoice, generateReference as genInvRef } from '@/lib/invoices';
 import { deleteJob, duplicateJob, fetchJob, formatJobDateTime, syncLastAppointmentFromJob, updateJob } from '@/lib/jobs';
 import { formatMoney } from '@/lib/money';
+import { linkJobToProperty } from '@/lib/properties';
 import { createQuote, generateReference as genQuoteRef } from '@/lib/quotes';
 import type { Attachment, Job } from '@/types/database';
 
@@ -22,6 +30,7 @@ export default function JobDetailScreen() {
   const [customerName, setCustomerName] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.id || !id) return;
@@ -30,6 +39,9 @@ export default function JobDetailScreen() {
     if (data) {
       const customer = await fetchCustomer(user.id, data.customer_id);
       setCustomerName(customer?.name ?? '');
+      if (customer) {
+        await linkJobToProperty(user.id, data, customer);
+      }
       setAttachments(await fetchAttachmentsForJob(user.id, data.id));
     }
   }, [user?.id, id]);
@@ -43,16 +55,46 @@ export default function JobDetailScreen() {
 
   const addPhoto = async (kind: 'photo_before' | 'photo_after') => {
     if (!user?.id || !job) return;
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Allow photo library access to attach before/after photos.');
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (result.canceled || !result.assets[0]) return;
-    await uploadAttachment(user.id, {
-      uri: result.assets[0].uri,
-      kind,
-      customerId: job.customer_id,
-      jobId: job.id,
-      fileName: result.assets[0].fileName ?? 'photo.jpg',
-    });
-    setAttachments(await fetchAttachmentsForJob(user.id, job.id));
+
+    setUploading(true);
+    try {
+      await uploadAttachment(user.id, {
+        uri: result.assets[0].uri,
+        kind,
+        customerId: job.customer_id,
+        jobId: job.id,
+        fileName: result.assets[0].fileName ?? 'photo.jpg',
+      });
+      setAttachments(await fetchAttachmentsForJob(user.id, job.id));
+    } catch (error) {
+      Alert.alert('Upload failed', error instanceof Error ? error.message : 'Could not upload photo');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeAttachment = (attachment: Attachment) => {
+    if (!user?.id) return;
+    Alert.alert('Remove photo', 'Delete this attachment?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteAttachment(user.id!, attachment);
+          if (job) setAttachments(await fetchAttachmentsForJob(user.id!, job.id));
+        },
+      },
+    ]);
   };
 
   const createQuoteFromJob = async () => {
@@ -70,7 +112,7 @@ export default function JobDetailScreen() {
     router.push(`/quote/${quote.id}`);
   };
 
-  const createInvoiceFromJob = async () => {
+  const createInvoiceFromJobAction = async () => {
     if (!user?.id || !job) return;
     const invoice = await createInvoice(user.id, {
       customer_id: job.customer_id,
@@ -89,7 +131,19 @@ export default function JobDetailScreen() {
     if (!user?.id || !job) return;
     const updated = await updateJob(user.id, job.id, { status: 'completed' });
     await syncLastAppointmentFromJob(user.id, job.customer_id, updated);
+    await scheduleAfterJobReminder(user.id, job.customer_id, updated.scheduled_at);
     setJob(updated);
+
+    Alert.alert('Job completed', 'Create an invoice from this job?', [
+      { text: 'Not now', style: 'cancel' },
+      {
+        text: 'Create invoice',
+        onPress: async () => {
+          const invoice = await createInvoiceFromJob(user.id, updated);
+          router.push(`/invoice/${invoice.id}`);
+        },
+      },
+    ]);
   };
 
   if (loading || !job) {
@@ -115,7 +169,7 @@ export default function JobDetailScreen() {
 
       <Pressable style={styles.btn} onPress={markComplete}><Text style={styles.btnText}>Mark completed ✔</Text></Pressable>
       <Pressable style={styles.btnSecondary} onPress={createQuoteFromJob}><Text style={styles.btnSecondaryText}>Create quote</Text></Pressable>
-      <Pressable style={styles.btnSecondary} onPress={createInvoiceFromJob}><Text style={styles.btnSecondaryText}>Create invoice</Text></Pressable>
+      <Pressable style={styles.btnSecondary} onPress={createInvoiceFromJobAction}><Text style={styles.btnSecondaryText}>Create invoice</Text></Pressable>
       <Pressable style={styles.btnSecondary} onPress={async () => {
         if (!user?.id) return;
         const dup = await duplicateJob(user.id, job);
@@ -124,12 +178,19 @@ export default function JobDetailScreen() {
 
       <Text style={styles.section}>Photos</Text>
       <View style={styles.photoRow}>
-        <Pressable style={styles.photoBtn} onPress={() => addPhoto('photo_before')}><Text style={styles.btnSecondaryText}>+ Before</Text></Pressable>
-        <Pressable style={styles.photoBtn} onPress={() => addPhoto('photo_after')}><Text style={styles.btnSecondaryText}>+ After</Text></Pressable>
+        <Pressable style={styles.photoBtn} disabled={uploading} onPress={() => addPhoto('photo_before')}>
+          <Text style={styles.btnSecondaryText}>+ Before</Text>
+        </Pressable>
+        <Pressable style={styles.photoBtn} disabled={uploading} onPress={() => addPhoto('photo_after')}>
+          <Text style={styles.btnSecondaryText}>+ After</Text>
+        </Pressable>
       </View>
-      {attachments.map((a) => (
-        <Text key={a.id} style={styles.meta}>{a.kind.replace('_', ' ')} · {a.file_name}</Text>
-      ))}
+      {uploading ? <Text style={styles.meta}>Uploading photo…</Text> : null}
+      <AttachmentGallery attachments={attachments.filter((a) => a.kind === 'photo_before' || a.kind === 'photo_after')} onDelete={removeAttachment} />
+
+      {user?.id ? (
+        <VoiceNotesSection userId={user.id} customerId={job.customer_id} jobId={job.id} />
+      ) : null}
 
       <Pressable onPress={() => router.push(`/customer/${job.customer_id}`)}><Text style={styles.link}>View client</Text></Pressable>
       <Pressable onPress={() => Alert.alert('Delete job', 'Are you sure?', [

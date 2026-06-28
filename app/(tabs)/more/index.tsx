@@ -8,17 +8,22 @@ import { Card } from '@/components/Card';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 import { colors, FREE_TIER_LIMIT, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTerminology } from '@/hooks/useTerminology';
 import { exportUserData, updateProfile } from '@/lib/customers';
 import { restorePurchases } from '@/lib/purchases';
 import { createTag, deleteTag, ensureDefaultTags, fetchTags } from '@/lib/tags';
-import type { Tag } from '@/types/database';
+import { BUSINESS_TYPES, WORK_LOCATIONS } from '@/lib/terminology';
+import type { BusinessType, Tag, WorkLocationType } from '@/types/database';
 
 export default function MoreScreen() {
   const { user, isPro, profile, signOut, refreshProfile } = useAuth();
+  const terms = useTerminology();
   const [tags, setTags] = useState<Tag[]>([]);
   const [businessName, setBusinessName] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
   const [businessEmail, setBusinessEmail] = useState('');
+  const [businessType, setBusinessType] = useState<BusinessType>('trades');
+  const [workLocation, setWorkLocation] = useState<WorkLocationType>('visit_customers');
   const [newTag, setNewTag] = useState('');
 
   useFocusEffect(
@@ -31,6 +36,8 @@ export default function MoreScreen() {
       setBusinessName(profile?.business_name ?? '');
       setBusinessPhone(profile?.business_phone ?? '');
       setBusinessEmail(profile?.business_email ?? '');
+      setBusinessType(profile?.business_type ?? 'trades');
+      setWorkLocation(profile?.work_location ?? 'visit_customers');
     }, [user?.id, profile]),
   );
 
@@ -40,6 +47,8 @@ export default function MoreScreen() {
       business_name: businessName.trim() || null,
       business_phone: businessPhone.trim() || null,
       business_email: businessEmail.trim() || null,
+      business_type: businessType,
+      work_location: workLocation,
     });
     await refreshProfile();
     Alert.alert('Saved', 'Business profile updated.');
@@ -86,6 +95,23 @@ export default function MoreScreen() {
 
   return (
     <KeyboardSafeScroll contentContainerStyle={styles.content} bottomInset={160} wrapStyle={styles.container}>
+      <Text style={styles.sectionTitle}>Business type</Text>
+      <Card style={styles.card}>
+        <Text style={styles.hint}>Changes labels across the app ({terms.job}, {terms.client}, etc.)</Text>
+        {BUSINESS_TYPES.map((item) => (
+          <Pressable key={item.id} style={styles.typeRow} onPress={() => setBusinessType(item.id)}>
+            <Text style={styles.typeIcon}>{item.icon}</Text>
+            <Text style={[styles.typeLabel, businessType === item.id && styles.typeSelected]}>{item.label}</Text>
+          </Pressable>
+        ))}
+        <Text style={[styles.label, styles.spaced]}>Work style</Text>
+        {WORK_LOCATIONS.map((item) => (
+          <Pressable key={item.id} style={styles.typeRow} onPress={() => setWorkLocation(item.id)}>
+            <Text style={[styles.typeLabel, workLocation === item.id && styles.typeSelected]}>{item.label}</Text>
+          </Pressable>
+        ))}
+      </Card>
+
       <Text style={styles.sectionTitle}>Business profile</Text>
       <Card style={styles.card}>
         <TextInput style={styles.input} value={businessName} onChangeText={setBusinessName} placeholder="Business name" placeholderTextColor={colors.textMuted} />
@@ -131,7 +157,7 @@ export default function MoreScreen() {
       <Pressable style={styles.row} onPress={handleRestore}><Text style={styles.rowText}>Restore purchases</Text></Pressable>
       <Pressable style={styles.row} onPress={handleSignOut}><Text style={[styles.rowText, styles.destructive]}>Sign out</Text></Pressable>
 
-      <Text style={styles.footer}>TradeKeep v2.0</Text>
+      <Text style={styles.footer}>TradeKeep v2.1</Text>
     </KeyboardSafeScroll>
   );
 }
@@ -149,6 +175,11 @@ const styles = StyleSheet.create({
   tagName: { ...typography.body, fontWeight: '600' },
   deleteTag: { ...typography.caption, color: colors.statusOverdue },
   tagAdd: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
+  hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
+  typeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs, gap: spacing.sm },
+  typeIcon: { fontSize: 20 },
+  typeLabel: { ...typography.body, color: colors.textSecondary, flex: 1 },
+  typeSelected: { color: colors.textPrimary, fontWeight: '700' },
   label: { ...typography.caption, color: colors.textSecondary },
   value: { ...typography.body, color: colors.textPrimary, marginTop: spacing.xs },
   spaced: { marginTop: spacing.md },

@@ -51,6 +51,7 @@ export default function QuoteDetailScreen() {
       materials: null,
       notes: null,
       quote_id: quote.id,
+      property_id: null,
     });
     await updateQuote(user.id, quote.id, { job_id: job.id });
     router.push(`/job/${job.id}`);

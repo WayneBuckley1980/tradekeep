@@ -14,35 +14,35 @@ import { Card } from '@/components/Card';
 import { JobRow } from '@/components/JobRow';
 import { colors, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTerminology } from '@/hooks/useTerminology';
 import { fetchCustomers } from '@/lib/customers';
-import { daysUntilFollowUp, getFollowUpUrgency } from '@/lib/dates';
-import { effectiveInvoiceStatus, fetchInvoices } from '@/lib/invoices';
+import { fetchDashboardKpis, fetchSmartHomeItems } from '@/lib/dashboard';
 import { fetchJobs, isJobToday } from '@/lib/jobs';
 import { formatMoney } from '@/lib/money';
-import { fetchQuotes } from '@/lib/quotes';
-import type { Customer, Invoice, Job, Quote } from '@/types/database';
+import type { Customer, DashboardKpis, Job, SmartHomeItem } from '@/types/database';
 
 export default function HomeScreen() {
   const { user, profile } = useAuth();
+  const terms = useTerminology();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [smartItems, setSmartItems] = useState<SmartHomeItem[]>([]);
+  const [kpis, setKpis] = useState<DashboardKpis | null>(null);
 
   const load = useCallback(async () => {
     if (!user?.id) return;
-    const [c, j, q, inv] = await Promise.all([
+    const [c, j, smart, stats] = await Promise.all([
       fetchCustomers(user.id),
       fetchJobs(user.id),
-      fetchQuotes(user.id),
-      fetchInvoices(user.id),
+      fetchSmartHomeItems(user.id),
+      fetchDashboardKpis(user.id),
     ]);
     setCustomers(c);
     setJobs(j);
-    setQuotes(q);
-    setInvoices(inv);
+    setSmartItems(smart);
+    setKpis(stats);
   }, [user?.id]);
 
   useFocusEffect(
@@ -73,22 +73,6 @@ export default function HomeScreen() {
 
   const name = profile?.business_name?.split(' ')[0] ?? 'there';
   const todayJobs = jobs.filter((j) => j.status !== 'cancelled' && j.status !== 'completed' && isJobToday(j.scheduled_at));
-  const upcomingJobs = jobs.filter(
-    (j) => j.status === 'upcoming' && !isJobToday(j.scheduled_at) && new Date(j.scheduled_at) > new Date(),
-  ).slice(0, 5);
-  const waitingQuotes = quotes.filter((q) => q.status === 'sent');
-  const overdueInvoices = invoices.filter((i) => effectiveInvoiceStatus(i) === 'overdue');
-  const outstandingInvoices = invoices.filter((i) => {
-    const s = effectiveInvoiceStatus(i);
-    return s === 'sent' || s === 'overdue';
-  });
-  const nextActions = customers.filter((c) => c.next_action && c.next_action_due_at);
-  const todayReminders = customers.filter((c) => {
-    const u = getFollowUpUrgency(c.follow_up_at);
-    return u === 'overdue' || u === 'today';
-  });
-  const favourites = customers.filter((c) => c.is_favourite).slice(0, 5);
-  const recent = [...customers].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 5);
   const customerMap = new Map(customers.map((c) => [c.id, c.name]));
 
   return (
@@ -105,12 +89,23 @@ export default function HomeScreen() {
 
       <Text style={styles.greeting}>Good morning, {name} 👋</Text>
 
+      {kpis ? (
+        <View style={styles.kpiGrid}>
+          <KpiCell label={`${terms.jobs} this month`} value={String(kpis.jobsThisMonth)} />
+          <KpiCell label="Revenue" value={formatMoney(kpis.revenueThisMonth)} />
+          <KpiCell label="Outstanding" value={formatMoney(kpis.outstanding)} />
+          <KpiCell label="Quotes waiting" value={String(kpis.quotesWaiting)} />
+          <KpiCell label="Win rate" value={`${kpis.winRate}%`} />
+          <KpiCell label="Avg job" value={formatMoney(kpis.averageJob)} />
+        </View>
+      ) : null}
+
       <View style={styles.quickRow}>
         {[
-          { label: 'Client', route: '/customer/new' },
-          { label: 'Job', route: '/job/new' },
-          { label: 'Quote', route: '/quote/new' },
-          { label: 'Invoice', route: '/invoice/new' },
+          { label: 'Lead', route: '/lead/new' },
+          { label: terms.client, route: '/customer/new' },
+          { label: terms.job, route: '/job/new' },
+          { label: terms.quote, route: '/quote/new' },
         ].map((item) => (
           <Pressable key={item.route} style={styles.quickBtn} onPress={() => router.push(item.route as never)}>
             <Text style={styles.quickBtnText}>+ {item.label}</Text>
@@ -118,7 +113,21 @@ export default function HomeScreen() {
         ))}
       </View>
 
-      <Section title={`Today's jobs (${todayJobs.length})`}>
+      <Section title="Today">
+        {smartItems.length === 0 ? (
+          <Text style={styles.empty}>You're all caught up.</Text>
+        ) : (
+          smartItems.map((item) => (
+            <Pressable key={item.id} onPress={() => router.push(item.route as never)}>
+              <Card style={styles.smartCard}>
+                <Text style={styles.smartText}>{item.icon} {item.title}</Text>
+              </Card>
+            </Pressable>
+          ))
+        )}
+      </Section>
+
+      <Section title={`${terms.todaysJobs} (${todayJobs.length})`}>
         {todayJobs.length === 0 ? (
           <Text style={styles.empty}>Nothing scheduled for today.</Text>
         ) : (
@@ -126,81 +135,8 @@ export default function HomeScreen() {
         )}
       </Section>
 
-      <Section title="Next actions">
-        {nextActions.length === 0 ? (
-          <Text style={styles.empty}>No next actions set.</Text>
-        ) : (
-          nextActions.slice(0, 8).map((c) => (
-            <Pressable key={c.id} onPress={() => router.push(`/customer/${c.id}`)}>
-              <Card style={styles.actionCard}>
-                <Text style={styles.actionTitle}>{c.next_action}</Text>
-                <Text style={styles.actionSub}>{c.name}</Text>
-              </Card>
-            </Pressable>
-          ))
-        )}
-      </Section>
-
-      <Section title="Today's reminders">
-        {todayReminders.length === 0 ? (
-          <Text style={styles.empty}>No follow-ups due today.</Text>
-        ) : (
-          todayReminders.map((c) => (
-            <Pressable key={c.id} onPress={() => router.push(`/customer/${c.id}`)}>
-              <Card style={styles.actionCard}>
-                <Text style={styles.actionTitle}>Follow up: {c.name}</Text>
-              </Card>
-            </Pressable>
-          ))
-        )}
-      </Section>
-
-      <Section title={`Outstanding quotes (${waitingQuotes.length})`}>
-        {waitingQuotes.length === 0 ? (
-          <Text style={styles.empty}>No quotes waiting.</Text>
-        ) : (
-          waitingQuotes.slice(0, 5).map((q) => (
-            <Pressable key={q.id} onPress={() => router.push(`/quote/${q.id}`)}>
-              <Card style={styles.actionCard}>
-                <Text style={styles.actionTitle}>{q.title}</Text>
-                <Text style={styles.actionSub}>{formatMoney(Number(q.amount))}</Text>
-              </Card>
-            </Pressable>
-          ))
-        )}
-      </Section>
-
-      <Section title={`Invoices waiting (${outstandingInvoices.length})`}>
-        {outstandingInvoices.length === 0 ? (
-          <Text style={styles.empty}>All caught up.</Text>
-        ) : (
-          outstandingInvoices.slice(0, 5).map((inv) => (
-            <Pressable key={inv.id} onPress={() => router.push(`/invoice/${inv.id}`)}>
-              <Card style={styles.actionCard}>
-                <Text style={styles.actionTitle}>{inv.title}</Text>
-                <Text style={[styles.actionSub, effectiveInvoiceStatus(inv) === 'overdue' && styles.overdue]}>
-                  {formatMoney(Number(inv.amount))} · {effectiveInvoiceStatus(inv)}
-                </Text>
-              </Card>
-            </Pressable>
-          ))
-        )}
-      </Section>
-
-      {overdueInvoices.length > 0 ? (
-        <Section title={`Overdue (${overdueInvoices.length})`}>
-          {overdueInvoices.map((inv) => (
-            <Pressable key={inv.id} onPress={() => router.push(`/invoice/${inv.id}`)}>
-              <Card style={styles.actionCard}>
-                <Text style={[styles.actionTitle, styles.overdue]}>{inv.title}</Text>
-              </Card>
-            </Pressable>
-          ))}
-        </Section>
-      ) : null}
-
       <Section title="Recent clients">
-        {recent.map((c) => (
+        {[...customers].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 5).map((c) => (
           <Pressable key={c.id} onPress={() => router.push(`/customer/${c.id}`)}>
             <Card style={styles.actionCard}>
               <Text style={styles.actionTitle}>{c.is_favourite ? `⭐ ${c.name}` : c.name}</Text>
@@ -209,6 +145,15 @@ export default function HomeScreen() {
         ))}
       </Section>
     </ScrollView>
+  );
+}
+
+function KpiCell({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.kpiCell}>
+      <Text style={styles.kpiValue}>{value}</Text>
+      <Text style={styles.kpiLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -235,6 +180,19 @@ const styles = StyleSheet.create({
   },
   searchText: { ...typography.body, color: colors.textMuted },
   greeting: { ...typography.title, color: colors.textPrimary, marginBottom: spacing.md },
+  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+  kpiCell: {
+    width: '30%',
+    flexGrow: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: 10,
+    padding: spacing.sm,
+    minWidth: 100,
+  },
+  kpiValue: { ...typography.heading, color: colors.textPrimary, fontWeight: '700', fontSize: 16 },
+  kpiLabel: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   quickBtn: {
     backgroundColor: colors.surface,
@@ -248,8 +206,8 @@ const styles = StyleSheet.create({
   section: { marginBottom: spacing.lg },
   sectionTitle: { ...typography.label, color: colors.textSecondary, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.8 },
   empty: { ...typography.caption, color: colors.textMuted },
+  smartCard: { marginBottom: spacing.sm },
+  smartText: { ...typography.body, color: colors.textPrimary },
   actionCard: { marginBottom: spacing.sm },
   actionTitle: { ...typography.body, color: colors.textPrimary, fontWeight: '600' },
-  actionSub: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
-  overdue: { color: colors.statusOverdue },
 });

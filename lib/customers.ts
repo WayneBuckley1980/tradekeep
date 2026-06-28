@@ -18,7 +18,7 @@ export async function ensureProfile(userId: string): Promise<Profile> {
 
   const { data, error } = await supabase
     .from('profiles')
-    .insert({ id: userId, subscription_tier: 'free' })
+    .insert({ id: userId, subscription_tier: 'free', business_type: 'trades', work_location: 'visit_customers', onboarding_completed: false })
     .select('*')
     .single();
 
@@ -26,11 +26,12 @@ export async function ensureProfile(userId: string): Promise<Profile> {
   return data;
 }
 
-export async function fetchCustomers(userId: string): Promise<Customer[]> {
-  const { data, error } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('user_id', userId)
+export async function fetchCustomers(userId: string, includeArchived = false): Promise<Customer[]> {
+  let query = supabase.from('customers').select('*').eq('user_id', userId);
+  if (!includeArchived) {
+    query = query.is('archived_at', null);
+  }
+  const { data, error } = await query
     .order('follow_up_at', { ascending: true, nullsFirst: false })
     .order('name', { ascending: true });
 
@@ -117,7 +118,17 @@ export async function updateNotificationIds(
 
 export async function updateProfile(
   userId: string,
-  payload: Partial<Pick<Profile, 'business_name' | 'business_phone' | 'business_email'>>,
+  payload: Partial<
+    Pick<
+      Profile,
+      | 'business_name'
+      | 'business_phone'
+      | 'business_email'
+      | 'business_type'
+      | 'work_location'
+      | 'onboarding_completed'
+    >
+  >,
 ): Promise<Profile> {
   const { data, error } = await supabase
     .from('profiles')
