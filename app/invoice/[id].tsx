@@ -11,12 +11,14 @@ import { fetchCustomer } from '@/lib/customers';
 import { duplicateInvoice, effectiveInvoiceStatus, fetchInvoice, updateInvoice } from '@/lib/invoices';
 import { formatMoney } from '@/lib/money';
 import { createPayment } from '@/lib/payments';
+import { fetchQuote } from '@/lib/quotes';
 
 export default function InvoiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const [invoice, setInvoice] = useState<Awaited<ReturnType<typeof fetchInvoice>>>(null);
   const [customerName, setCustomerName] = useState('');
+  const [linkedQuoteRef, setLinkedQuoteRef] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -28,6 +30,12 @@ export default function InvoiceDetailScreen() {
       const c = await fetchCustomer(user.id, inv.customer_id);
       setCustomerName(c?.name ?? '');
       setPaymentAmount(String(inv.amount));
+      if (inv.quote_id) {
+        const quote = await fetchQuote(user.id, inv.quote_id);
+        setLinkedQuoteRef(quote?.reference ?? null);
+      } else {
+        setLinkedQuoteRef(null);
+      }
     }
   }, [user?.id, id]);
 
@@ -73,6 +81,7 @@ export default function InvoiceDetailScreen() {
         <StatusBadge label={status} status={status} />
       </View>
       <Text style={styles.meta}>{invoice.reference} · {customerName}</Text>
+      {linkedQuoteRef ? <Text style={styles.meta}>Quote {linkedQuoteRef}</Text> : null}
       <Text style={styles.amount}>{formatMoney(Number(invoice.amount))}</Text>
 
       <Card style={styles.card}>

@@ -1,5 +1,8 @@
+import { generateInvoiceReference } from '@/lib/references';
 import { supabase } from '@/lib/supabase';
 import type { Invoice, InvoiceInsert, InvoiceStatus, InvoiceUpdate } from '@/types/database';
+
+export { generateInvoiceReference as generateReference, generateReference as generateReferenceWithPrefix } from '@/lib/references';
 
 export async function fetchInvoices(userId: string): Promise<Invoice[]> {
   const { data, error } = await supabase
@@ -36,14 +39,71 @@ export async function fetchInvoice(userId: string, invoiceId: string): Promise<I
   return data;
 }
 
+export async function fetchInvoiceForJob(userId: string, jobId: string): Promise<Invoice | null> {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('job_id', jobId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchInvoiceForQuote(userId: string, quoteId: string): Promise<Invoice | null> {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('quote_id', quoteId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchInvoicedQuoteIds(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('quote_id')
+    .eq('user_id', userId)
+    .not('quote_id', 'is', null);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.quote_id as string);
+}
+
+export async function assertInvoiceAllowed(
+  userId: string,
+  payload: Pick<InvoiceInsert, 'job_id' | 'quote_id'>,
+): Promise<void> {
+  if (payload.quote_id) {
+    const existing = await fetchInvoiceForQuote(userId, payload.quote_id);
+    if (existing) throw new Error('This quote has already been invoiced.');
+  }
+  if (payload.job_id) {
+    const existing = await fetchInvoiceForJob(userId, payload.job_id);
+    if (existing) throw new Error('This job has already been invoiced.');
+  }
+}
+
 export async function createInvoice(userId: string, payload: InvoiceInsert): Promise<Invoice> {
+  await assertInvoiceAllowed(userId, payload);
+
   const { data, error } = await supabase
     .from('invoices')
     .insert({ ...payload, user_id: userId })
     .select('*')
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505') {
+      if (payload.quote_id) throw new Error('This quote has already been invoiced.');
+      if (payload.job_id) throw new Error('This job has already been invoiced.');
+    }
+    throw error;
+  }
   return data;
 }
 
@@ -83,17 +143,12 @@ export function effectiveInvoiceStatus(invoice: Invoice): InvoiceStatus {
   return invoice.status;
 }
 
-export function generateReference(prefix: string): string {
-  const n = Date.now().toString(36).toUpperCase();
-  return `${prefix}-${n.slice(-6)}`;
-}
-
 export async function duplicateInvoice(userId: string, invoice: Invoice): Promise<Invoice> {
   return createInvoice(userId, {
     customer_id: invoice.customer_id,
-    job_id: invoice.job_id,
-    quote_id: invoice.quote_id,
-    reference: generateReference('INV'),
+    job_id: null,
+    quote_id: null,
+    reference: generateInvoiceReference(),
     title: invoice.title,
     amount: invoice.amount,
     status: 'draft',

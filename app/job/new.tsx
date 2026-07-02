@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 
 import { JobForm, JobFormValues } from '@/components/JobForm';
 import { useAuth } from '@/contexts/AuthContext';
-import { createJob, syncLastAppointmentFromJob } from '@/lib/jobs';
+import { createJob, generateJobReference, syncLastAppointmentFromJob } from '@/lib/jobs';
 
 export default function NewJobScreen() {
   const { user } = useAuth();
@@ -11,6 +11,7 @@ export default function NewJobScreen() {
     if (!user?.id) throw new Error('Not signed in');
     const job = await createJob(user.id, {
       customer_id: values.customer_id,
+      reference: generateJobReference(),
       title: values.title.trim(),
       description: values.description.trim() || null,
       scheduled_at: values.scheduled_at.toISOString(),

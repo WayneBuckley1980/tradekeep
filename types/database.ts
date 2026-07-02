@@ -149,6 +149,7 @@ export type Job = {
   id: string;
   user_id: string;
   customer_id: string;
+  reference: string | null;
   title: string;
   description: string | null;
   scheduled_at: string;

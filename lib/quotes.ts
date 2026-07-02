@@ -1,5 +1,8 @@
+import { fetchInvoicedQuoteIds } from '@/lib/invoices';
 import { supabase } from '@/lib/supabase';
 import type { Quote, QuoteInsert, QuoteUpdate } from '@/types/database';
+
+export { generateQuoteReference as generateReference, generateReference as generateReferenceWithPrefix } from '@/lib/references';
 
 export async function fetchQuotes(userId: string): Promise<Quote[]> {
   const { data, error } = await supabase
@@ -65,7 +68,32 @@ export async function deleteQuote(userId: string, quoteId: string): Promise<void
   if (error) throw error;
 }
 
-export function generateReference(prefix: string): string {
-  const n = Date.now().toString(36).toUpperCase();
-  return `${prefix}-${n.slice(-6)}`;
+export async function fetchQuotesForJob(userId: string, jobId: string): Promise<Quote[]> {
+  const { data, error } = await supabase
+    .from('quotes')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('job_id', jobId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchUninvoicedQuotesForCustomer(
+  userId: string,
+  customerId: string,
+  jobId?: string,
+): Promise<Quote[]> {
+  const [quotes, invoicedIds] = await Promise.all([
+    fetchQuotesForCustomer(userId, customerId),
+    fetchInvoicedQuoteIds(userId),
+  ]);
+  const invoiced = new Set(invoicedIds);
+  const uninvoiced = quotes.filter((q) => !invoiced.has(q.id));
+  if (!jobId) return uninvoiced;
+
+  const forJob = uninvoiced.filter((q) => q.job_id === jobId);
+  const other = uninvoiced.filter((q) => q.job_id !== jobId);
+  return [...forJob, ...other];
 }

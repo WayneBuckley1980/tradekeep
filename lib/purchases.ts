@@ -8,7 +8,7 @@ import Purchases, {
 const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY ?? '';
 export const ENTITLEMENT_ID = 'pro';
 export const PRODUCT_MONTHLY = 'tradekeep_pro_monthly';
-export const PRODUCT_ANNUAL = 'tradekeep_pro_annual';
+export const PRODUCT_ANNUAL = 'tradekeep_pro_annually';
 
 export const isPurchasesConfigured = Boolean(apiKey) && Platform.OS === 'ios';
 

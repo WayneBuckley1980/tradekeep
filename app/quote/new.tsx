@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { CustomerPicker } from '@/components/CustomerPicker';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 import { QuoteLineItemsForm, useQuoteLineItemsState } from '@/components/QuoteLineItemsForm';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchCustomer } from '@/lib/customers';
+import { fetchJob, updateJob } from '@/lib/jobs';
 import { saveQuoteLineItems } from '@/lib/quoteItems';
 import { createQuote, generateReference } from '@/lib/quotes';
 import type { Customer, QuoteStatus } from '@/types/database';
@@ -14,6 +16,7 @@ import type { Customer, QuoteStatus } from '@/types/database';
 const STATUSES: QuoteStatus[] = ['draft', 'sent', 'accepted', 'rejected'];
 
 export default function NewQuoteScreen() {
+  const { customerId: paramCustomerId, jobId } = useLocalSearchParams<{ customerId?: string; jobId?: string }>();
   const { user } = useAuth();
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -21,7 +24,37 @@ export default function NewQuoteScreen() {
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<QuoteStatus>('sent');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [fromJob, setFromJob] = useState(false);
   const { items, setItems, discount, setDiscount } = useQuoteLineItemsState();
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const prefill = async () => {
+      if (jobId) {
+        const job = await fetchJob(user.id, jobId);
+        if (!job) return;
+        setFromJob(true);
+        setCustomerId(job.customer_id);
+        const customer = await fetchCustomer(user.id, job.customer_id);
+        setCustomerName(customer?.name ?? '');
+        setTitle(job.title);
+        setDescription(job.description ?? '');
+        if (job.price != null && Number(job.price) > 0) {
+          setItems([{ label: job.title, amount: String(job.price) }]);
+        }
+        return;
+      }
+
+      if (paramCustomerId) {
+        setCustomerId(paramCustomerId);
+        const customer = await fetchCustomer(user.id, paramCustomerId);
+        setCustomerName(customer?.name ?? '');
+      }
+    };
+
+    prefill().catch(console.error);
+  }, [user?.id, jobId, paramCustomerId, setItems]);
 
   const save = async () => {
     if (!user?.id || !customerId || !title.trim()) {
@@ -38,8 +71,8 @@ export default function NewQuoteScreen() {
 
     const quote = await createQuote(user.id, {
       customer_id: customerId,
-      job_id: null,
-      reference: generateReference('Q'),
+      job_id: jobId ?? null,
+      reference: generateReference(),
       title: title.trim(),
       description: description.trim() || null,
       amount: total,
@@ -55,6 +88,10 @@ export default function NewQuoteScreen() {
       await saveQuoteLineItems(user.id, quote.id, rows);
     }
 
+    if (jobId) {
+      await updateJob(user.id, jobId, { quote_id: quote.id });
+    }
+
     router.replace(`/quote/${quote.id}`);
   };
 
@@ -63,7 +100,7 @@ export default function NewQuoteScreen() {
   return (
     <>
       <KeyboardSafeScroll contentContainerStyle={styles.container} keyboardVerticalOffset={Platform.OS === 'ios' ? 110 : 0}>
-        <Pressable style={styles.input} onPress={() => setPickerOpen(true)}>
+        <Pressable style={styles.input} onPress={() => !fromJob && setPickerOpen(true)} disabled={fromJob}>
           <Text style={customerId ? styles.text : styles.placeholder}>{customerName || 'Select client *'}</Text>
         </Pressable>
         <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Quote title *" placeholderTextColor={colors.textMuted} />

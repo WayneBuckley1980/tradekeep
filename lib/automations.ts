@@ -1,16 +1,22 @@
 import { fetchCustomer, updateCustomer } from '@/lib/customers';
-import { createInvoice, generateReference } from '@/lib/invoices';
+import { assertInvoiceAllowed, createInvoice, fetchInvoiceForJob, generateReference } from '@/lib/invoices';
 import { fetchPaymentsForCustomer } from '@/lib/payments';
 import { computeFollowUpDate } from '@/lib/reminders';
 import { addDays, formatDateOnly, parseDateOnly } from '@/lib/dates';
 import type { Invoice, Job } from '@/types/database';
 
 export async function createInvoiceFromJob(userId: string, job: Job, quoteId?: string | null): Promise<Invoice> {
+  const existing = await fetchInvoiceForJob(userId, job.id);
+  if (existing) throw new Error('This job has already been invoiced.');
+
+  const resolvedQuoteId = quoteId ?? job.quote_id;
+  await assertInvoiceAllowed(userId, { job_id: job.id, quote_id: resolvedQuoteId });
+
   return createInvoice(userId, {
     customer_id: job.customer_id,
     job_id: job.id,
     quote_id: quoteId ?? job.quote_id,
-    reference: generateReference('INV'),
+    reference: generateReference(),
     title: job.title,
     amount: job.price ?? 0,
     status: 'sent',

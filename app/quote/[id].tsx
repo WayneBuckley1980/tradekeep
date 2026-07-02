@@ -7,7 +7,8 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { colors, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchCustomer } from '@/lib/customers';
-import { createJob } from '@/lib/jobs';
+import { fetchInvoiceForQuote } from '@/lib/invoices';
+import { createJob, generateJobReference } from '@/lib/jobs';
 import { formatMoney } from '@/lib/money';
 import { fetchQuote, updateQuote } from '@/lib/quotes';
 
@@ -16,6 +17,7 @@ export default function QuoteDetailScreen() {
   const { user } = useAuth();
   const [quote, setQuote] = useState<Awaited<ReturnType<typeof fetchQuote>>>(null);
   const [customerName, setCustomerName] = useState('');
+  const [invoicedRef, setInvoicedRef] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -23,8 +25,12 @@ export default function QuoteDetailScreen() {
     const q = await fetchQuote(user.id, id);
     setQuote(q);
     if (q) {
-      const c = await fetchCustomer(user.id, q.customer_id);
+      const [c, invoice] = await Promise.all([
+        fetchCustomer(user.id, q.customer_id),
+        fetchInvoiceForQuote(user.id, q.id),
+      ]);
       setCustomerName(c?.name ?? '');
+      setInvoicedRef(invoice?.reference ?? null);
     }
   }, [user?.id, id]);
 
@@ -39,6 +45,7 @@ export default function QuoteDetailScreen() {
     const customer = await fetchCustomer(user.id, quote.customer_id);
     const job = await createJob(user.id, {
       customer_id: quote.customer_id,
+      reference: generateJobReference(),
       title: quote.title,
       description: quote.description,
       scheduled_at: new Date().toISOString(),
@@ -66,6 +73,7 @@ export default function QuoteDetailScreen() {
         <StatusBadge label={quote.status} status={quote.status} />
       </View>
       <Text style={styles.meta}>{quote.reference} · {customerName}</Text>
+      {invoicedRef ? <Text style={styles.meta}>Invoiced as {invoicedRef}</Text> : null}
       <Text style={styles.amount}>{formatMoney(Number(quote.amount))}</Text>
       {quote.description ? <Card style={styles.card}><Text style={styles.body}>{quote.description}</Text></Card> : null}
       <Pressable style={styles.btn} onPress={acceptAndCreateJob}><Text style={styles.btnText}>Accept → Create job</Text></Pressable>

@@ -1,5 +1,8 @@
+import { generateJobReference } from '@/lib/references';
 import { supabase } from '@/lib/supabase';
 import type { Job, JobInsert, JobStatus, JobUpdate } from '@/types/database';
+
+export { generateJobReference } from '@/lib/references';
 
 export async function fetchJobs(userId: string): Promise<Job[]> {
   const { data, error } = await supabase
@@ -115,6 +118,7 @@ export async function duplicateJob(userId: string, job: Job): Promise<Job> {
 
   return createJob(userId, {
     customer_id: job.customer_id,
+    reference: generateJobReference(),
     title: job.title,
     description: job.description,
     scheduled_at: nextWeek.toISOString(),

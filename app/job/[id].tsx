@@ -14,20 +14,20 @@ import {
   fetchAttachmentsForJob,
   uploadAttachment,
 } from '@/lib/attachments';
-import { createInvoiceFromJob, scheduleAfterJobReminder } from '@/lib/automations';
+import { scheduleAfterJobReminder } from '@/lib/automations';
 import { fetchCustomer } from '@/lib/customers';
-import { createInvoice, generateReference as genInvRef } from '@/lib/invoices';
+import { fetchInvoiceForJob } from '@/lib/invoices';
 import { deleteJob, duplicateJob, fetchJob, formatJobDateTime, syncLastAppointmentFromJob, updateJob } from '@/lib/jobs';
 import { formatMoney } from '@/lib/money';
 import { linkJobToProperty } from '@/lib/properties';
-import { createQuote, generateReference as genQuoteRef } from '@/lib/quotes';
-import type { Attachment, Job } from '@/types/database';
+import type { Attachment, Invoice, Job } from '@/types/database';
 
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const [job, setJob] = useState<Job | null>(null);
   const [customerName, setCustomerName] = useState('');
+  const [jobInvoice, setJobInvoice] = useState<Invoice | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -37,8 +37,12 @@ export default function JobDetailScreen() {
     const data = await fetchJob(user.id, id);
     setJob(data);
     if (data) {
-      const customer = await fetchCustomer(user.id, data.customer_id);
+      const [customer, invoice] = await Promise.all([
+        fetchCustomer(user.id, data.customer_id),
+        fetchInvoiceForJob(user.id, data.id),
+      ]);
       setCustomerName(customer?.name ?? '');
+      setJobInvoice(invoice);
       if (customer) {
         await linkJobToProperty(user.id, data, customer);
       }
@@ -97,34 +101,18 @@ export default function JobDetailScreen() {
     ]);
   };
 
-  const createQuoteFromJob = async () => {
-    if (!user?.id || !job) return;
-    const quote = await createQuote(user.id, {
-      customer_id: job.customer_id,
-      job_id: job.id,
-      reference: genQuoteRef('Q'),
-      title: job.title,
-      description: job.description,
-      amount: job.price ?? 0,
-      status: 'sent',
-      valid_until: null,
-    });
-    router.push(`/quote/${quote.id}`);
+  const openCreateQuote = () => {
+    if (!job) return;
+    router.push({ pathname: '/quote/new', params: { jobId: job.id } });
   };
 
-  const createInvoiceFromJobAction = async () => {
-    if (!user?.id || !job) return;
-    const invoice = await createInvoice(user.id, {
-      customer_id: job.customer_id,
-      job_id: job.id,
-      quote_id: job.quote_id,
-      reference: genInvRef('INV'),
-      title: job.title,
-      amount: job.price ?? 0,
-      status: 'sent',
-      due_at: null,
-    });
-    router.push(`/invoice/${invoice.id}`);
+  const openCreateInvoice = () => {
+    if (!job) return;
+    if (jobInvoice) {
+      router.push(`/invoice/${jobInvoice.id}`);
+      return;
+    }
+    router.push({ pathname: '/invoice/new', params: { jobId: job.id } });
   };
 
   const markComplete = async () => {
@@ -134,14 +122,13 @@ export default function JobDetailScreen() {
     await scheduleAfterJobReminder(user.id, job.customer_id, updated.scheduled_at);
     setJob(updated);
 
+    if (jobInvoice) return;
+
     Alert.alert('Job completed', 'Create an invoice from this job?', [
       { text: 'Not now', style: 'cancel' },
       {
         text: 'Create invoice',
-        onPress: async () => {
-          const invoice = await createInvoiceFromJob(user.id, updated);
-          router.push(`/invoice/${invoice.id}`);
-        },
+        onPress: () => router.push({ pathname: '/invoice/new', params: { jobId: updated.id } }),
       },
     ]);
   };
@@ -156,6 +143,7 @@ export default function JobDetailScreen() {
         <Text style={styles.title}>{job.title}</Text>
         <StatusBadge label={job.status.replace('_', ' ')} status={job.status} />
       </View>
+      {job.reference ? <Text style={styles.meta}>{job.reference}</Text> : null}
       <Text style={styles.meta}>{formatJobDateTime(job.scheduled_at)}</Text>
       <Text style={styles.meta}>{customerName}</Text>
       {job.price != null ? <Text style={styles.price}>{formatMoney(Number(job.price))}</Text> : null}
@@ -168,8 +156,10 @@ export default function JobDetailScreen() {
       </Card>
 
       <Pressable style={styles.btn} onPress={markComplete}><Text style={styles.btnText}>Mark completed ✔</Text></Pressable>
-      <Pressable style={styles.btnSecondary} onPress={createQuoteFromJob}><Text style={styles.btnSecondaryText}>Create quote</Text></Pressable>
-      <Pressable style={styles.btnSecondary} onPress={createInvoiceFromJobAction}><Text style={styles.btnSecondaryText}>Create invoice</Text></Pressable>
+      <Pressable style={styles.btnSecondary} onPress={openCreateQuote}><Text style={styles.btnSecondaryText}>Create quote</Text></Pressable>
+      <Pressable style={[styles.btnSecondary, jobInvoice && styles.btnDisabled]} onPress={openCreateInvoice}>
+        <Text style={styles.btnSecondaryText}>{jobInvoice ? `Invoiced (${jobInvoice.reference})` : 'Create invoice'}</Text>
+      </Pressable>
       <Pressable style={styles.btnSecondary} onPress={async () => {
         if (!user?.id) return;
         const dup = await duplicateJob(user.id, job);
@@ -218,6 +208,7 @@ const styles = StyleSheet.create({
   btn: { backgroundColor: colors.ctaBackground, borderRadius: 12, padding: spacing.md, alignItems: 'center', marginBottom: spacing.sm },
   btnText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
   btnSecondary: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 12, padding: spacing.md, alignItems: 'center', marginBottom: spacing.sm },
+  btnDisabled: { opacity: 0.7 },
   btnSecondaryText: { ...typography.label, color: colors.textPrimary, fontWeight: '600' },
   section: { ...typography.label, color: colors.textSecondary, marginTop: spacing.md, marginBottom: spacing.sm, textTransform: 'uppercase' },
   photoRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
