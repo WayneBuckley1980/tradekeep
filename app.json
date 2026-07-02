@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "TradeKeep",
+    "name": "TradeKeepCRM",
     "slug": "tradekeep",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -39,7 +39,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "TradeKeep needs photo library access for before/after job photos and client documents."
+          "photosPermission": "TradeKeepCRM needs photo library access for before/after job photos and client documents."
         }
       ],
       "expo-audio"

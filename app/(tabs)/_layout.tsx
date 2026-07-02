@@ -19,7 +19,7 @@ export default function TabLayout() {
           tabBarInactiveTintColor: colors.textMuted,
         }}
       >
-        <Tabs.Screen name="home" options={{ title: 'Home', headerTitle: 'TradeKeep' }} />
+        <Tabs.Screen name="home" options={{ title: 'Home', headerTitle: 'TradeKeepCRM' }} />
         <Tabs.Screen name="clients" options={{ title: 'Clients' }} />
         <Tabs.Screen name="jobs" options={{ title: 'Jobs' }} />
         <Tabs.Screen name="money" options={{ title: 'Money' }} />

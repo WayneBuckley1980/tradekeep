@@ -157,7 +157,7 @@ export default function MoreScreen() {
       <Pressable style={styles.row} onPress={handleRestore}><Text style={styles.rowText}>Restore purchases</Text></Pressable>
       <Pressable style={styles.row} onPress={handleSignOut}><Text style={[styles.rowText, styles.destructive]}>Sign out</Text></Pressable>
 
-      <Text style={styles.footer}>TradeKeep v2.1</Text>
+      <Text style={styles.footer}>TradeKeepCRM v2.2</Text>
     </KeyboardSafeScroll>
   );
 }

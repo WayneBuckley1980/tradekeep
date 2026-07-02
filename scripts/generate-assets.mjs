@@ -57,7 +57,7 @@ function renderBrandedSvg({
       font-size="${fontSize}"
       font-weight="700"
       fill="#FFFFFF"
-    >TradeKeep</text>
+    >TradeKeepCRM</text>
   </svg>
 </svg>`);
 }
@@ -73,7 +73,7 @@ async function main() {
     tileWidth: 928,
     tileHeight: 928,
     cornerRadius: 224,
-    fontSize: 148,
+    fontSize: 88,
     borderWidth: 6,
     borderColor: '#FFFFFF',
     shadowBlur: 56,
@@ -88,7 +88,7 @@ async function main() {
     tileWidth: 980,
     tileHeight: 520,
     cornerRadius: 260,
-    fontSize: 156,
+    fontSize: 96,
     borderWidth: 6,
     borderColor: '#FFFFFF',
     shadowBlur: 64,

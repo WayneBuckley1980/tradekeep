@@ -1,8 +1,8 @@
-# Privacy Policy — TradeKeep
+# Privacy Policy — TradeKeepCRM
 
 **Last updated:** June 2026
 
-TradeKeep ("we", "the app") helps solo service professionals manage client information and follow-up reminders.
+TradeKeepCRM ("we", "the app") helps solo service professionals manage client information and follow-up reminders.
 
 ## Data we collect
 
@@ -41,7 +41,12 @@ You may delete your account and all client data by signing out and contacting su
 
 ## Contact
 
-Add your support email before App Store submission.
+Email: [wayne.buckley@hotmail.co.uk](mailto:wayne.buckley@hotmail.co.uk)
+
+Public pages (after GitHub Pages deploy):
+
+- Support: https://waynebuckley1980.github.io/tradekeep/
+- Privacy: https://waynebuckley1980.github.io/tradekeep/privacy.html
 
 ## Terms
 

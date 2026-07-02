@@ -56,7 +56,7 @@ export default function SignInScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.content}>
-        <Text style={styles.brand}>TradeKeep</Text>
+        <Text style={styles.brand}>TradeKeepCRM</Text>
         <Text style={styles.tagline}>Keep what your clients like. Know when to chase them.</Text>
 
         {!isSupabaseConfigured ? (

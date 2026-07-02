@@ -1,6 +1,6 @@
-# TradeKeep
+# TradeKeepCRM
 
-iOS client tracker for solo tradespersons — barbers, cleaners, handymen, and more.
+iOS CRM for solo tradespersons — barbers, cleaners, handymen, and more.
 
 **Tagline:** Keep what your clients like. Know when to chase them.
 
@@ -71,8 +71,16 @@ Configure `eas.json` and replace `extra.eas.projectId` in `app.json` after `eas 
 node scripts/generate-assets.mjs
 ```
 
-Generates the pure-black app icon and graphite splash with **TradeKeep** wordmark.
+Generates the pure-black app icon and graphite splash with **TradeKeepCRM** wordmark.
 
-## Privacy
+## Privacy & support
 
-See [docs/PRIVACY.md](docs/PRIVACY.md)
+- Support: [docs/index.html](docs/index.html) → deploy via [docs/DEPLOY.md](docs/DEPLOY.md)
+- Privacy policy: [docs/privacy.html](docs/privacy.html)
+
+After GitHub Pages deploy:
+
+- **Support URL:** `https://waynebuckley1980.github.io/tradekeep/`
+- **Privacy URL:** `https://waynebuckley1980.github.io/tradekeep/privacy.html`
+
+See [docs/PRIVACY.md](docs/PRIVACY.md) for the markdown source.

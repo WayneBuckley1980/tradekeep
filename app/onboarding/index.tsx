@@ -41,14 +41,14 @@ export default function OnboardingScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.textPrimary} />
-        <Text style={styles.subtitle}>Setting up TradeKeep…</Text>
+        <Text style={styles.subtitle}>Setting up TradeKeepCRM…</Text>
       </View>
     );
   }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Welcome to TradeKeep</Text>
+      <Text style={styles.title}>Welcome to TradeKeepCRM</Text>
       <Text style={styles.subtitle}>
         {step === 1 ? 'What best describes your business?' : 'How do you usually work?'}
       </Text>
