@@ -18,7 +18,7 @@ export async function ensureProfile(userId: string): Promise<Profile> {
 
   const { data, error } = await supabase
     .from('profiles')
-    .insert({ id: userId, subscription_tier: 'free', business_type: 'trades', work_location: 'visit_customers', onboarding_completed: false })
+    .insert({ id: userId, subscription_tier: 'free', business_type: null, work_location: 'visit_customers', onboarding_completed: true })
     .select('*')
     .single();
 

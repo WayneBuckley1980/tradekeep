@@ -15,6 +15,11 @@ export type Terminology = {
   serviceReminder: string;
   addJob: string;
   todaysJobs: string;
+  workflowQuote: string;
+  workflowOrder: string;
+  workflowWork: string;
+  workflowInvoice: string;
+  workflowClosed: string;
 };
 
 const BASE: Terminology = {
@@ -32,6 +37,11 @@ const BASE: Terminology = {
   serviceReminder: 'Service reminder',
   addJob: 'New job',
   todaysJobs: "Today's jobs",
+  workflowQuote: 'Quote',
+  workflowOrder: 'Order agreed',
+  workflowWork: 'Work completed',
+  workflowInvoice: 'Invoice raised',
+  workflowClosed: 'Job closed',
 };
 
 const MAP: Record<BusinessType, Partial<Terminology>> = {
@@ -77,6 +87,42 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     serviceReminder: 'Next groom reminder',
     addJob: 'New groom',
     todaysJobs: "Today's grooms",
+    workflowOrder: 'Booking confirmed',
+    workflowWork: 'Groom completed',
+  },
+  dog_walker: {
+    client: 'Client',
+    clients: 'Clients',
+    job: 'Walk',
+    jobs: 'Walks',
+    quote: 'Quote',
+    quotes: 'Quotes',
+    siteNotes: 'Dog notes',
+    serviceReminder: 'Next walk reminder',
+    addJob: 'New walk',
+    todaysJobs: "Today's walks",
+    workflowQuote: 'Quote',
+    workflowOrder: 'Walk booked',
+    workflowWork: 'Walk completed',
+    workflowInvoice: 'Invoice raised',
+    workflowClosed: 'Walk closed',
+  },
+  dog_trainer: {
+    client: 'Client',
+    clients: 'Clients',
+    job: 'Session',
+    jobs: 'Sessions',
+    quote: 'Quote',
+    quotes: 'Quotes',
+    siteNotes: 'Training notes',
+    serviceReminder: 'Next session reminder',
+    addJob: 'New session',
+    todaysJobs: "Today's sessions",
+    workflowQuote: 'Quote',
+    workflowOrder: 'Session booked',
+    workflowWork: 'Session completed',
+    workflowInvoice: 'Invoice raised',
+    workflowClosed: 'Training closed',
   },
   cleaning: {
     job: 'Visit',
@@ -139,6 +185,8 @@ export const BUSINESS_TYPES: { id: BusinessType; label: string; icon: string }[]
   { id: 'pt', label: 'Personal Trainer', icon: '🏋️' },
   { id: 'photographer', label: 'Photographer', icon: '📸' },
   { id: 'dog_groomer', label: 'Dog Groomer', icon: '🐶' },
+  { id: 'dog_walker', label: 'Dog Walker', icon: '🦮' },
+  { id: 'dog_trainer', label: 'Dog Trainer', icon: '🎾' },
   { id: 'cleaning', label: 'Cleaning Business', icon: '🧹' },
   { id: 'gardening', label: 'Gardening & Landscaping', icon: '🌿' },
   { id: 'tutor', label: 'Tutor / Coach', icon: '🎓' },
@@ -174,6 +222,14 @@ export const DEFAULT_JOB_TEMPLATES: Record<BusinessType, { title: string; durati
   ],
   dog_groomer: [
     { title: 'Full groom', duration_minutes: 90, materials: 'Wash, cut, nails', suggested_price: 55 },
+  ],
+  dog_walker: [
+    { title: '30 minute walk', duration_minutes: 30, materials: 'Lead, waste bags', suggested_price: 15 },
+    { title: 'Group walk (1 hour)', duration_minutes: 60, materials: 'Group walk, report card', suggested_price: 22 },
+  ],
+  dog_trainer: [
+    { title: '1-to-1 training session', duration_minutes: 60, materials: 'Behaviour assessment, homework', suggested_price: 45 },
+    { title: 'Puppy class', duration_minutes: 45, materials: 'Socialisation, basic commands', suggested_price: 35 },
   ],
   cleaning: [
     { title: 'Regular clean', duration_minutes: 120, materials: 'Standard cleaning products', suggested_price: 80 },

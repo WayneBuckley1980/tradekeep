@@ -1,48 +1,50 @@
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
-  ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
+import { BusinessTypeGate, BusinessTypePicker } from '@/components/BusinessTypePicker';
 import { Card } from '@/components/Card';
-import { JobRow } from '@/components/JobRow';
-import { colors, spacing, typography } from '@/constants/theme';
+import { CustomerRow } from '@/components/CustomerRow';
+import { EmptyState } from '@/components/EmptyState';
+import { SearchBar } from '@/components/SearchBar';
+import { SwipeToDelete } from '@/components/SwipeToDelete';
+import { colors, FREE_TIER_LIMIT, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTerminology } from '@/hooks/useTerminology';
-import { fetchCustomers } from '@/lib/customers';
-import { fetchDashboardKpis, fetchSmartHomeItems } from '@/lib/dashboard';
-import { fetchJobs, isJobToday } from '@/lib/jobs';
-import { formatMoney } from '@/lib/money';
-import type { Customer, DashboardKpis, Job, SmartHomeItem } from '@/types/database';
+import { fetchCustomers, updateProfile, deleteCustomer } from '@/lib/customers';
+import { filterCustomers, groupCustomers, sortCustomers } from '@/lib/customerGroups';
+import { convertLeadToClient, deleteLead, fetchLeads, leadStatusLabel } from '@/lib/leads';
+import { DEFAULT_JOB_TEMPLATES } from '@/lib/terminology';
+import { seedDefaultTemplates } from '@/lib/templates';
+import type { BusinessType, Customer, Lead } from '@/types/database';
 
 export default function HomeScreen() {
-  const { user, profile } = useAuth();
+  const { user, isPro, profile, refreshProfile } = useAuth();
   const terms = useTerminology();
+  const needsBusinessType = !profile?.business_type;
+
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [query, setQuery] = useState('');
+  const [tab, setTab] = useState<'clients' | 'leads'>('clients');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [smartItems, setSmartItems] = useState<SmartHomeItem[]>([]);
-  const [kpis, setKpis] = useState<DashboardKpis | null>(null);
+  const [savingType, setSavingType] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.id) return;
-    const [c, j, smart, stats] = await Promise.all([
-      fetchCustomers(user.id),
-      fetchJobs(user.id),
-      fetchSmartHomeItems(user.id),
-      fetchDashboardKpis(user.id),
-    ]);
-    setCustomers(c);
-    setJobs(j);
-    setSmartItems(smart);
-    setKpis(stats);
+    const [data, leadData] = await Promise.all([fetchCustomers(user.id), fetchLeads(user.id)]);
+    setCustomers(sortCustomers(data));
+    setLeads(leadData.filter((l) => l.status !== 'won' && l.status !== 'lost'));
   }, [user?.id]);
 
   useFocusEffect(
@@ -63,6 +65,34 @@ export default function HomeScreen() {
     }
   };
 
+  const handleSelectBusinessType = async (type: BusinessType) => {
+    if (!user?.id) return;
+    setSavingType(true);
+    try {
+      await updateProfile(user.id, { business_type: type });
+      await seedDefaultTemplates(
+        user.id,
+        DEFAULT_JOB_TEMPLATES[type].map((t) => ({ ...t, description: null })),
+      );
+      await refreshProfile();
+    } catch (error) {
+      Alert.alert('Could not save', error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setSavingType(false);
+    }
+  };
+
+  const handleConvertLead = async (lead: Lead) => {
+    if (!user?.id) return;
+    try {
+      const customer = await convertLeadToClient(user.id, lead.id);
+      await load();
+      router.push(`/customer/${customer.id}`);
+    } catch (error) {
+      Alert.alert('Could not convert', error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -71,143 +101,158 @@ export default function HomeScreen() {
     );
   }
 
-  const name = profile?.business_name?.split(' ')[0] ?? 'there';
-  const todayJobs = jobs.filter((j) => j.status !== 'cancelled' && j.status !== 'completed' && isJobToday(j.scheduled_at));
-  const customerMap = new Map(customers.map((c) => [c.id, c.name]));
+  if (needsBusinessType) {
+    return (
+      <View style={styles.container}>
+        <BusinessTypeGate onSelect={handleSelectBusinessType} saving={savingType} />
+      </View>
+    );
+  }
+
+  const filtered = filterCustomers(customers, query);
+  const sections = groupCustomers(filtered);
+  const filteredLeads = leads.filter(
+    (l) =>
+      !query.trim() ||
+      l.name.toLowerCase().includes(query.toLowerCase()) ||
+      l.requested_service?.toLowerCase().includes(query.toLowerCase()),
+  );
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textPrimary} />}
-    >
-      <Pressable onPress={() => router.push('/search')}>
-        <View style={styles.searchStub}>
-          <Text style={styles.searchText}>Search clients, jobs, notes…</Text>
-        </View>
-      </Pressable>
-
-      <Text style={styles.greeting}>Good morning, {name} 👋</Text>
-
-      {kpis ? (
-        <View style={styles.kpiGrid}>
-          <KpiCell label={`${terms.jobs} this month`} value={String(kpis.jobsThisMonth)} />
-          <KpiCell label="Revenue" value={formatMoney(kpis.revenueThisMonth)} />
-          <KpiCell label="Outstanding" value={formatMoney(kpis.outstanding)} />
-          <KpiCell label="Quotes waiting" value={String(kpis.quotesWaiting)} />
-          <KpiCell label="Win rate" value={`${kpis.winRate}%`} />
-          <KpiCell label="Avg job" value={formatMoney(kpis.averageJob)} />
-        </View>
-      ) : null}
-
-      <View style={styles.quickRow}>
-        {[
-          { label: 'Lead', route: '/lead/new' },
-          { label: terms.client, route: '/customer/new' },
-          { label: terms.job, route: '/job/new' },
-          { label: terms.quote, route: '/quote/new' },
-        ].map((item) => (
-          <Pressable key={item.route} style={styles.quickBtn} onPress={() => router.push(item.route as never)}>
-            <Text style={styles.quickBtnText}>+ {item.label}</Text>
-          </Pressable>
-        ))}
+    <View style={styles.container}>
+      <View style={styles.typeBar}>
+        <Text style={styles.typeLabel}>Business type</Text>
+        <BusinessTypePicker
+          compact
+          value={profile?.business_type ?? null}
+          onChange={handleSelectBusinessType}
+        />
       </View>
 
-      <Section title="Today">
-        {smartItems.length === 0 ? (
-          <Text style={styles.empty}>You're all caught up.</Text>
-        ) : (
-          smartItems.map((item) => (
-            <Pressable key={item.id} onPress={() => router.push(item.route as never)}>
-              <Card style={styles.smartCard}>
-                <Text style={styles.smartText}>{item.icon} {item.title}</Text>
+      <View style={styles.tabRow}>
+        <Pressable style={[styles.tab, tab === 'clients' && styles.tabActive]} onPress={() => setTab('clients')}>
+          <Text style={styles.tabText}>{terms.clients}</Text>
+        </Pressable>
+        <Pressable style={[styles.tab, tab === 'leads' && styles.tabActive]} onPress={() => setTab('leads')}>
+          <Text style={styles.tabText}>Leads ({leads.length})</Text>
+        </Pressable>
+      </View>
+
+      <Pressable onPress={() => router.push('/search')} style={styles.searchWrap}>
+        <SearchBar value={query} onChangeText={setQuery} placeholder={`Search ${terms.clients.toLowerCase()}, leads…`} />
+      </Pressable>
+
+      {!isPro && tab === 'clients' ? (
+        <Text style={styles.limit}>
+          {customers.length}/{FREE_TIER_LIMIT} clients on free plan
+        </Text>
+      ) : null}
+
+      {tab === 'leads' ? (
+        <SectionList
+          sections={[{ title: 'Active leads', data: filteredLeads }]}
+          keyExtractor={(item) => item.id}
+          renderSectionHeader={() => null}
+          renderItem={({ item }) => (
+            <SwipeToDelete
+              deleteLabel="Delete"
+              confirmTitle="Delete lead"
+              confirmMessage="Remove this enquiry?"
+              onDelete={async () => {
+                if (!user?.id) return;
+                await deleteLead(user.id, item.id);
+                await load();
+              }}
+            >
+              <Card style={styles.leadCard}>
+                <Pressable onPress={() => router.push(`/lead/${item.id}` as never)}>
+                  <Text style={styles.leadName}>{item.name}</Text>
+                  {item.requested_service ? <Text style={styles.leadService}>{item.requested_service}</Text> : null}
+                  <Text style={styles.leadStatus}>{leadStatusLabel(item.status)}</Text>
+                </Pressable>
+                <Pressable style={styles.convertBtn} onPress={() => void handleConvertLead(item)}>
+                  <Text style={styles.convertText}>Convert to client</Text>
+                </Pressable>
               </Card>
+            </SwipeToDelete>
+          )}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textPrimary} />
+          }
+          ListEmptyComponent={
+            <EmptyState title="No leads yet" message="Capture enquiries before they become clients." />
+          }
+          ListHeaderComponent={
+            <Pressable style={styles.addLead} onPress={() => router.push('/lead/new' as never)}>
+              <Text style={styles.addLeadText}>+ New lead</Text>
             </Pressable>
-          ))
-        )}
-      </Section>
-
-      <Section title={`${terms.todaysJobs} (${todayJobs.length})`}>
-        {todayJobs.length === 0 ? (
-          <Text style={styles.empty}>Nothing scheduled for today.</Text>
-        ) : (
-          todayJobs.map((job) => <JobRow key={job.id} job={job} customerName={customerMap.get(job.customer_id)} />)
-        )}
-      </Section>
-
-      <Section title="Recent clients">
-        {[...customers].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 5).map((c) => (
-          <Pressable key={c.id} onPress={() => router.push(`/customer/${c.id}`)}>
-            <Card style={styles.actionCard}>
-              <Text style={styles.actionTitle}>{c.is_favourite ? `⭐ ${c.name}` : c.name}</Text>
-            </Card>
-          </Pressable>
-        ))}
-      </Section>
-    </ScrollView>
-  );
-}
-
-function KpiCell({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.kpiCell}>
-      <Text style={styles.kpiValue}>{value}</Text>
-      <Text style={styles.kpiLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
+          }
+        />
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.id}
+          renderSectionHeader={({ section: { title } }) => (
+            <Text style={styles.sectionTitle}>{title}</Text>
+          )}
+          renderItem={({ item }) => (
+            <SwipeToDelete
+              deleteLabel="Delete"
+              confirmTitle={`Delete ${terms.client.toLowerCase()}`}
+              confirmMessage="This cannot be undone."
+              onDelete={async () => {
+                if (!user?.id) return;
+                await deleteCustomer(user.id, item.id);
+                await load();
+              }}
+            >
+              <CustomerRow customer={item} />
+            </SwipeToDelete>
+          )}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textPrimary} />
+          }
+          ListEmptyComponent={
+            <EmptyState
+              title={`Add your first ${terms.client.toLowerCase()}`}
+              message="Tap a client to manage quotes, work, and invoices in one place."
+            />
+          }
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.md, paddingBottom: 120 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  searchStub: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-  },
-  searchText: { ...typography.body, color: colors.textMuted },
-  greeting: { ...typography.title, color: colors.textPrimary, marginBottom: spacing.md },
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  kpiCell: {
-    width: '30%',
-    flexGrow: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: 10,
-    padding: spacing.sm,
-    minWidth: 100,
-  },
-  kpiValue: { ...typography.heading, color: colors.textPrimary, fontWeight: '700', fontSize: 16 },
-  kpiLabel: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
-  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  quickBtn: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: 10,
-    paddingVertical: spacing.sm,
+  typeBar: { paddingTop: spacing.sm, paddingBottom: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
+  typeLabel: { ...typography.caption, color: colors.textMuted, paddingHorizontal: spacing.md, marginBottom: spacing.xs },
+  tabRow: { flexDirection: 'row', paddingHorizontal: spacing.md, gap: spacing.sm, marginTop: spacing.sm, marginBottom: spacing.sm },
+  tab: { flex: 1, borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 10, padding: spacing.sm, alignItems: 'center' },
+  tabActive: { borderColor: colors.textPrimary, backgroundColor: colors.surfaceElevated },
+  tabText: { ...typography.label, color: colors.textPrimary, fontWeight: '600' },
+  searchWrap: { paddingHorizontal: spacing.md },
+  limit: { ...typography.caption, color: colors.textSecondary, paddingHorizontal: spacing.md, marginBottom: spacing.sm },
+  sectionTitle: {
+    ...typography.label,
+    color: colors.textSecondary,
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
-  quickBtnText: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
-  section: { marginBottom: spacing.lg },
-  sectionTitle: { ...typography.label, color: colors.textSecondary, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.8 },
-  empty: { ...typography.caption, color: colors.textMuted },
-  smartCard: { marginBottom: spacing.sm },
-  smartText: { ...typography.body, color: colors.textPrimary },
-  actionCard: { marginBottom: spacing.sm },
-  actionTitle: { ...typography.body, color: colors.textPrimary, fontWeight: '600' },
+  listContent: { paddingHorizontal: spacing.md, paddingBottom: 120 },
+  leadCard: { marginBottom: spacing.sm },
+  leadName: { ...typography.heading, color: colors.textPrimary, fontSize: 18 },
+  leadService: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  leadStatus: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs, textTransform: 'capitalize' },
+  convertBtn: { marginTop: spacing.sm, backgroundColor: colors.surfaceElevated, borderRadius: 8, padding: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.borderSubtle },
+  convertText: { ...typography.caption, color: colors.textPrimary, fontWeight: '700' },
+  addLead: { backgroundColor: colors.ctaBackground, borderRadius: 10, padding: spacing.md, alignItems: 'center', marginBottom: spacing.md },
+  addLeadText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
 });

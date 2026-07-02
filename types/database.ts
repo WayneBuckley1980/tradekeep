@@ -7,6 +7,8 @@ export type BusinessType =
   | 'pt'
   | 'photographer'
   | 'dog_groomer'
+  | 'dog_walker'
+  | 'dog_trainer'
   | 'cleaning'
   | 'gardening'
   | 'tutor'
@@ -65,7 +67,7 @@ export type Profile = {
   business_name: string | null;
   business_phone: string | null;
   business_email: string | null;
-  business_type: BusinessType;
+  business_type: BusinessType | null;
   work_location: WorkLocationType;
   onboarding_completed: boolean;
   created_at: string;

@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -12,8 +11,11 @@ import {
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { Card } from '@/components/Card';
+import { ClientDocumentsSection } from '@/components/ClientDocumentsSection';
 import { ContactActions } from '@/components/CustomerRow';
+import { EquipmentSection } from '@/components/EquipmentSection';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
+import { PropertyHistorySection } from '@/components/PropertyHistorySection';
 import { UrgencyBanner } from '@/components/UrgencyBanner';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,28 +26,22 @@ import { getCustomerHealth, healthLabel, ratingStars } from '@/lib/customerHealt
 import { formatDisplayDate, formatRelativeDate } from '@/lib/dates';
 import { fetchInvoicesForCustomer } from '@/lib/invoices';
 import { fetchJobsForCustomer } from '@/lib/jobs';
-import { fetchCustomerSummary, formatMoney } from '@/lib/money';
-import {
-  cancelNotificationIds,
-} from '@/lib/notifications';
+import { formatMoney } from '@/lib/money';
+import { cancelNotificationIds } from '@/lib/notifications';
 import { fetchPaymentsForCustomer } from '@/lib/payments';
+import { ensurePrimaryProperty, fetchPropertiesForCustomer, groupJobsByProperty } from '@/lib/properties';
 import { fetchQuotesForCustomer } from '@/lib/quotes';
 import { formatAddress } from '@/lib/search';
 import { buildCustomerTimeline } from '@/lib/timeline';
-import { ensurePrimaryProperty, fetchPropertiesForCustomer, groupJobsByProperty } from '@/lib/properties';
-import { ClientDocumentsSection } from '@/components/ClientDocumentsSection';
-import { EquipmentSection } from '@/components/EquipmentSection';
-import { PropertyHistorySection } from '@/components/PropertyHistorySection';
 import type { CommunicationLog, Customer, CustomerHealth, TimelineEntry } from '@/types/database';
 import type { PropertyJobGroup } from '@/lib/properties';
 
-export default function CustomerDetailScreen() {
+export default function CustomerDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const terms = useTerminology();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [health, setHealth] = useState<CustomerHealth | null>(null);
-  const [summary, setSummary] = useState({ totalSpent: 0, balanceOwing: 0, lastJobTitle: null as string | null, lastJobDate: null as string | null });
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [commLogs, setCommLogs] = useState<CommunicationLog[]>([]);
   const [propertyGroups, setPropertyGroups] = useState<PropertyJobGroup[]>([]);
@@ -62,16 +58,14 @@ export default function CustomerDetailScreen() {
     }
     setCustomer(data);
     setNotes(data.notes ?? '');
-    const [jobs, quotes, invoices, payments, sum, logs, healthData] = await Promise.all([
+    const [jobs, quotes, invoices, payments, logs, healthData] = await Promise.all([
       fetchJobsForCustomer(user.id, id),
       fetchQuotesForCustomer(user.id, id),
       fetchInvoicesForCustomer(user.id, id),
       fetchPaymentsForCustomer(user.id, id),
-      fetchCustomerSummary(user.id, id),
       fetchCommunicationLogs(user.id, id),
       getCustomerHealth(user.id, data),
     ]);
-    setSummary(sum);
     setHealth(healthData);
     setCommLogs(logs);
     setTimeline(buildCustomerTimeline(jobs, quotes, invoices, payments, data));
@@ -107,7 +101,7 @@ export default function CustomerDetailScreen() {
     setHealth(await getCustomerHealth(user.id, updated));
   };
 
-  const handleLogComm = async (type: typeof COMM_TYPES[number]['id']) => {
+  const handleLogComm = async (type: (typeof COMM_TYPES)[number]['id']) => {
     if (!user?.id || !customer) return;
     await logCommunication(user.id, customer.id, type);
     setCommLogs(await fetchCommunicationLogs(user.id, customer.id));
@@ -123,7 +117,7 @@ export default function CustomerDetailScreen() {
         text: 'Archive',
         onPress: async () => {
           await updateCustomer(user.id, customer.id, { archived_at: new Date().toISOString() });
-          router.back();
+          router.replace('/(tabs)/home');
         },
       },
     ]);
@@ -139,7 +133,7 @@ export default function CustomerDetailScreen() {
           if (!user?.id || !customer) return;
           await cancelNotificationIds(customer.notification_ids);
           await deleteCustomer(user.id, customer.id);
-          router.back();
+          router.replace('/(tabs)/home');
         },
       },
     ]);
@@ -298,11 +292,8 @@ export default function CustomerDetailScreen() {
         <Pressable style={styles.btn} onPress={() => router.push(`/customer/${customer.id}/edit`)}>
           <Text style={styles.btnText}>Edit</Text>
         </Pressable>
-        <Pressable style={styles.btnSecondary} onPress={() => router.push({ pathname: '/job/new', params: { customerId: customer.id } })}>
-          <Text style={styles.btnSecondaryText}>+ {terms.job}</Text>
-        </Pressable>
-        <Pressable style={styles.btnSecondary} onPress={() => router.push({ pathname: '/quote/new', params: { customerId: customer.id } })}>
-          <Text style={styles.btnSecondaryText}>+ {terms.quote}</Text>
+        <Pressable style={styles.btnSecondary} onPress={() => router.back()}>
+          <Text style={styles.btnSecondaryText}>← Workspace</Text>
         </Pressable>
       </View>
 

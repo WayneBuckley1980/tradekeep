@@ -14,13 +14,14 @@ import { router, useFocusEffect } from 'expo-router';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { StatusBadge } from '@/components/StatusBadge';
+import { SwipeToDelete } from '@/components/SwipeToDelete';
 import { colors, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchCustomers } from '@/lib/customers';
-import { effectiveInvoiceStatus, fetchInvoices } from '@/lib/invoices';
+import { deleteInvoice, effectiveInvoiceStatus, fetchInvoices } from '@/lib/invoices';
 import { fetchMoneyStats, formatMoney } from '@/lib/money';
 import { fetchPayments } from '@/lib/payments';
-import { fetchQuotes } from '@/lib/quotes';
+import { deleteQuote, fetchQuotes } from '@/lib/quotes';
 import type { Customer, Invoice, Payment, Quote } from '@/types/database';
 
 const SECTIONS = ['overview', 'quotes', 'invoices', 'payments'] as const;
@@ -62,6 +63,18 @@ export default function MoneyScreen() {
   );
 
   const customerMap = new Map(customers.map((c) => [c.id, c.name]));
+
+  const removeQuote = async (quoteId: string) => {
+    if (!user?.id) return;
+    await deleteQuote(user.id, quoteId);
+    setQuotes(await fetchQuotes(user.id));
+  };
+
+  const removeInvoice = async (invoiceId: string) => {
+    if (!user?.id) return;
+    await deleteInvoice(user.id, invoiceId);
+    setInvoices(await fetchInvoices(user.id));
+  };
 
   if (loading) {
     return (
@@ -110,16 +123,22 @@ export default function MoneyScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <Pressable onPress={() => router.push(`/quote/${item.id}`)}>
-              <Card style={styles.row}>
-                <View style={styles.rowHeader}>
-                  <Text style={styles.rowTitle}>{item.title}</Text>
-                  <StatusBadge label={item.status} status={item.status} />
-                </View>
-                <Text style={styles.rowSub}>{customerMap.get(item.customer_id)}</Text>
-                <Text style={styles.rowAmount}>{formatMoney(Number(item.amount))}</Text>
-              </Card>
-            </Pressable>
+            <SwipeToDelete
+              deleteLabel="Delete"
+              confirmTitle="Delete quote"
+              onDelete={() => removeQuote(item.id)}
+            >
+              <Pressable onPress={() => router.push(`/quote/${item.id}`)}>
+                <Card style={styles.row}>
+                  <View style={styles.rowHeader}>
+                    <Text style={styles.rowTitle}>{item.title}</Text>
+                    <StatusBadge label={item.status} status={item.status} />
+                  </View>
+                  <Text style={styles.rowSub}>{customerMap.get(item.customer_id)}</Text>
+                  <Text style={styles.rowAmount}>{formatMoney(Number(item.amount))}</Text>
+                </Card>
+              </Pressable>
+            </SwipeToDelete>
           )}
           ListEmptyComponent={<EmptyState title="No quotes" message="Create a quote from + menu." />}
         />
@@ -133,16 +152,22 @@ export default function MoneyScreen() {
           renderItem={({ item }) => {
             const status = effectiveInvoiceStatus(item);
             return (
-              <Pressable onPress={() => router.push(`/invoice/${item.id}`)}>
-                <Card style={styles.row}>
-                  <View style={styles.rowHeader}>
-                    <Text style={styles.rowTitle}>{item.title}</Text>
-                    <StatusBadge label={status} status={status} />
-                  </View>
-                  <Text style={styles.rowSub}>{customerMap.get(item.customer_id)}</Text>
-                  <Text style={styles.rowAmount}>{formatMoney(Number(item.amount))}</Text>
-                </Card>
-              </Pressable>
+              <SwipeToDelete
+                deleteLabel="Delete"
+                confirmTitle="Delete invoice"
+                onDelete={() => removeInvoice(item.id)}
+              >
+                <Pressable onPress={() => router.push(`/invoice/${item.id}`)}>
+                  <Card style={styles.row}>
+                    <View style={styles.rowHeader}>
+                      <Text style={styles.rowTitle}>{item.title}</Text>
+                      <StatusBadge label={status} status={status} />
+                    </View>
+                    <Text style={styles.rowSub}>{customerMap.get(item.customer_id)}</Text>
+                    <Text style={styles.rowAmount}>{formatMoney(Number(item.amount))}</Text>
+                  </Card>
+                </Pressable>
+              </SwipeToDelete>
             );
           }}
           ListEmptyComponent={<EmptyState title="No invoices" message="Create an invoice when work is done." />}

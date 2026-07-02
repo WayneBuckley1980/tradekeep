@@ -108,6 +108,7 @@ const styles = StyleSheet.create({
   },
   brand: {
     ...typography.title,
+    fontSize: 36,
     color: colors.textPrimary,
     textAlign: 'center',
   },

@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { Tabs } from 'expo-router';
 
+import { BrandTitle } from '@/components/BrandTitle';
 import { GlobalFab } from '@/components/GlobalFab';
 import { colors } from '@/constants/theme';
 
@@ -19,8 +20,14 @@ export default function TabLayout() {
           tabBarInactiveTintColor: colors.textMuted,
         }}
       >
-        <Tabs.Screen name="home" options={{ title: 'Home', headerTitle: 'TradeKeepCRM' }} />
-        <Tabs.Screen name="clients" options={{ title: 'Clients' }} />
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: 'Home',
+            headerTitle: () => <BrandTitle />,
+          }}
+        />
+        <Tabs.Screen name="clients" options={{ href: null }} />
         <Tabs.Screen name="jobs" options={{ title: 'Jobs' }} />
         <Tabs.Screen name="money" options={{ title: 'Money' }} />
         <Tabs.Screen name="more" options={{ title: 'More' }} />

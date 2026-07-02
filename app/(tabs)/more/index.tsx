@@ -22,7 +22,7 @@ export default function MoreScreen() {
   const [businessName, setBusinessName] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
   const [businessEmail, setBusinessEmail] = useState('');
-  const [businessType, setBusinessType] = useState<BusinessType>('trades');
+  const [businessType, setBusinessType] = useState<BusinessType | null>(null);
   const [workLocation, setWorkLocation] = useState<WorkLocationType>('visit_customers');
   const [newTag, setNewTag] = useState('');
 
@@ -36,13 +36,16 @@ export default function MoreScreen() {
       setBusinessName(profile?.business_name ?? '');
       setBusinessPhone(profile?.business_phone ?? '');
       setBusinessEmail(profile?.business_email ?? '');
-      setBusinessType(profile?.business_type ?? 'trades');
+      setBusinessType(profile?.business_type ?? null);
       setWorkLocation(profile?.work_location ?? 'visit_customers');
     }, [user?.id, profile]),
   );
 
   const saveBusiness = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !businessType) {
+      Alert.alert('Business type required', 'Select a business type before saving.');
+      return;
+    }
     await updateProfile(user.id, {
       business_name: businessName.trim() || null,
       business_phone: businessPhone.trim() || null,
