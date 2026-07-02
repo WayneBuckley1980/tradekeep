@@ -45,7 +45,7 @@ Set secrets: `REVENUECAT_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`
 ### 3. RevenueCat & App Store
 
 1. Create App Store Connect app (iPhone, iPad, Mac Designed for iPad)
-2. Products: `tradekeep_pro_monthly`, `tradekeep_pro_annual`
+2. Products: `tradekeep_pro_monthly`, `tradekeep_pro_annually`
 3. RevenueCat entitlement: `pro`
 4. Point webhook to your Supabase edge function
 

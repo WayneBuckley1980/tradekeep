@@ -23,6 +23,7 @@ export function JobRow({ job, customerName }: JobRowProps) {
         </View>
         <Text style={styles.meta}>{formatJobDateTime(job.scheduled_at)}</Text>
         {customerName ? <Text style={styles.meta}>{customerName}</Text> : null}
+        {job.reference ? <Text style={styles.meta}>{job.reference}</Text> : null}
         {job.price != null ? <Text style={styles.price}>{formatMoney(Number(job.price))}</Text> : null}
       </Card>
     </Pressable>
