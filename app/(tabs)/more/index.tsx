@@ -1,15 +1,12 @@
 import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-
 import { Card } from '@/components/Card';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 import { colors, FREE_TIER_LIMIT, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTerminology } from '@/hooks/useTerminology';
-import { exportUserData, updateProfile } from '@/lib/customers';
+import { updateProfile } from '@/lib/customers';
 import { restorePurchases } from '@/lib/purchases';
 import { createTag, deleteTag, ensureDefaultTags, fetchTags } from '@/lib/tags';
 import { BUSINESS_TYPES, WORK_LOCATIONS } from '@/lib/terminology';
@@ -55,18 +52,6 @@ export default function MoreScreen() {
     });
     await refreshProfile();
     Alert.alert('Saved', 'Business profile updated.');
-  };
-
-  const handleExport = async () => {
-    if (!user?.id) return;
-    const data = await exportUserData(user.id);
-    const path = `${FileSystem.cacheDirectory}tradekeep-export.json`;
-    await FileSystem.writeAsStringAsync(path, JSON.stringify(data, null, 2));
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(path);
-    } else {
-      Alert.alert('Exported', 'Data saved to cache.');
-    }
   };
 
   const handleRestore = async () => {
@@ -156,7 +141,10 @@ export default function MoreScreen() {
         ) : null}
       </Card>
 
-      <Pressable style={styles.row} onPress={handleExport}><Text style={styles.rowText}>Export data</Text></Pressable>
+      <Text style={styles.sectionTitle}>Export data</Text>
+      <Pressable style={styles.row} onPress={() => router.push('/export' as never)}>
+        <Text style={styles.rowText}>Export CSV & backup</Text>
+      </Pressable>
       <Pressable style={styles.row} onPress={handleRestore}><Text style={styles.rowText}>Restore purchases</Text></Pressable>
       <Pressable style={styles.row} onPress={handleSignOut}><Text style={[styles.rowText, styles.destructive]}>Sign out</Text></Pressable>
 
