@@ -8,9 +8,15 @@ import type { Customer, Invoice, Job, Lead, Quote, QuoteLineItem } from '@/types
 
 const UTF8_BOM = '\uFEFF';
 
-export type CsvExportKind = 'clients' | 'leads' | 'jobs' | 'quotes' | 'quote_line_items' | 'invoices';
-
-export type CsvExportCounts = Record<CsvExportKind, number>;
+export type CsvExportSummary = {
+  clients: number;
+  leads: number;
+  jobs: number;
+  quotes: number;
+  quoteLines: number;
+  invoices: number;
+  totalRows: number;
+};
 
 export type CsvExportResult = {
   filename: string;
@@ -19,6 +25,44 @@ export type CsvExportResult = {
 };
 
 type CsvCell = string | number | boolean | null | undefined;
+
+type RecordType = 'Client' | 'Lead' | 'Job' | 'Quote' | 'Quote Line' | 'Invoice';
+
+type ExportRow = {
+  clientName: string;
+  clientPhone: string;
+  clientEmail: string;
+  recordType: RecordType;
+  reference: string;
+  titleDescription: string;
+  date: string;
+  sortDate: string;
+  amount: string;
+  status: string;
+  notes: string;
+};
+
+const RECORD_TYPE_ORDER: Record<RecordType, number> = {
+  Client: 0,
+  Lead: 1,
+  Job: 2,
+  Quote: 3,
+  'Quote Line': 4,
+  Invoice: 5,
+};
+
+const CSV_HEADERS = [
+  'Client Name',
+  'Client Phone',
+  'Client Email',
+  'Record Type',
+  'Reference',
+  'Title/Description',
+  'Date',
+  'Amount (GBP)',
+  'Status',
+  'Notes',
+];
 
 export function escapeCsvField(value: CsvCell): string {
   if (value === null || value === undefined) return '';
@@ -60,8 +104,23 @@ export function formatCsvMoney(amount: number | null | undefined): string {
   return amount.toFixed(2);
 }
 
-function customerName(customers: Map<string, Customer>, customerId: string): string {
-  return customers.get(customerId)?.name ?? '';
+function joinTitleDescription(title: string, description: string | null | undefined): string {
+  const parts = [title, description?.trim()].filter(Boolean);
+  return parts.join(' — ');
+}
+
+function clientStatus(customer: Customer): string {
+  if (customer.archived_at) return 'Archived';
+  if (customer.is_favourite) return 'Favourite';
+  return 'Active';
+}
+
+function clientColumns(customer: Customer): Pick<ExportRow, 'clientName' | 'clientPhone' | 'clientEmail'> {
+  return {
+    clientName: customer.name,
+    clientPhone: customer.phone ?? '',
+    clientEmail: customer.email ?? '',
+  };
 }
 
 async function fetchAllQuoteLineItems(userId: string): Promise<QuoteLineItem[]> {
@@ -75,12 +134,124 @@ async function fetchAllQuoteLineItems(userId: string): Promise<QuoteLineItem[]> 
   return data ?? [];
 }
 
-function lineItemsSummary(items: QuoteLineItem[]): string {
-  if (items.length === 0) return '';
-  return items.map((item) => `${item.label}: ${formatCsvMoney(Number(item.amount))}`).join('; ');
+function sortExportRows(rows: ExportRow[]): ExportRow[] {
+  return [...rows].sort((a, b) => {
+    const nameCompare = a.clientName.localeCompare(b.clientName, 'en-GB', { sensitivity: 'base' });
+    if (nameCompare !== 0) return nameCompare;
+
+    const typeCompare = RECORD_TYPE_ORDER[a.recordType] - RECORD_TYPE_ORDER[b.recordType];
+    if (typeCompare !== 0) return typeCompare;
+
+    return a.sortDate.localeCompare(b.sortDate);
+  });
 }
 
-export async function fetchCsvExportCounts(userId: string): Promise<CsvExportCounts> {
+function exportRowToCsv(row: ExportRow): CsvCell[] {
+  return [
+    row.clientName,
+    row.clientPhone,
+    row.clientEmail,
+    row.recordType,
+    row.reference,
+    row.titleDescription,
+    row.date,
+    row.amount,
+    row.status,
+    row.notes,
+  ];
+}
+
+function buildClientRow(customer: Customer): ExportRow {
+  const sortDate = customer.last_contacted_at ?? customer.created_at;
+  const titleParts = [customer.next_action?.trim(), customer.follow_up_at ? `Follow-up ${formatCsvDate(customer.follow_up_at)}` : '']
+    .filter(Boolean)
+    .join('; ');
+
+  return {
+    ...clientColumns(customer),
+    recordType: 'Client',
+    reference: '',
+    titleDescription: titleParts || 'Client record',
+    date: formatCsvDateTime(sortDate),
+    sortDate,
+    amount: formatCsvMoney(customer.amount_paid),
+    status: clientStatus(customer),
+    notes: customer.notes ?? '',
+  };
+}
+
+function buildLeadRow(customer: Customer, lead: Lead): ExportRow {
+  return {
+    ...clientColumns(customer),
+    recordType: 'Lead',
+    reference: '',
+    titleDescription: lead.requested_service ?? lead.name,
+    date: formatCsvDateTime(lead.created_at),
+    sortDate: lead.created_at,
+    amount: '',
+    status: leadStatusLabel(lead.status),
+    notes: lead.notes ?? '',
+  };
+}
+
+function buildJobRow(customer: Customer, job: Job): ExportRow {
+  return {
+    ...clientColumns(customer),
+    recordType: 'Job',
+    reference: job.reference ?? '',
+    titleDescription: joinTitleDescription(job.title, job.description),
+    date: formatCsvDateTime(job.scheduled_at),
+    sortDate: job.scheduled_at,
+    amount: formatCsvMoney(job.price),
+    status: job.status,
+    notes: [job.materials, job.notes].filter(Boolean).join('; '),
+  };
+}
+
+function buildQuoteRow(customer: Customer, quote: Quote): ExportRow {
+  const validUntil = quote.valid_until ? `Valid until ${formatCsvDate(quote.valid_until)}` : '';
+  return {
+    ...clientColumns(customer),
+    recordType: 'Quote',
+    reference: quote.reference ?? '',
+    titleDescription: joinTitleDescription(quote.title, quote.description),
+    date: formatCsvDateTime(quote.created_at),
+    sortDate: quote.created_at,
+    amount: formatCsvMoney(Number(quote.amount)),
+    status: quote.status,
+    notes: validUntil,
+  };
+}
+
+function buildQuoteLineRow(customer: Customer, quote: Quote, item: QuoteLineItem): ExportRow {
+  return {
+    ...clientColumns(customer),
+    recordType: 'Quote Line',
+    reference: quote.reference ?? '',
+    titleDescription: item.label,
+    date: formatCsvDateTime(quote.created_at),
+    sortDate: quote.created_at,
+    amount: formatCsvMoney(Number(item.amount)),
+    status: quote.status,
+    notes: '',
+  };
+}
+
+function buildInvoiceRow(customer: Customer, invoice: Invoice): ExportRow {
+  return {
+    ...clientColumns(customer),
+    recordType: 'Invoice',
+    reference: invoice.reference ?? '',
+    titleDescription: invoice.title,
+    date: formatCsvDate(invoice.due_at ?? invoice.created_at),
+    sortDate: invoice.due_at ?? invoice.created_at,
+    amount: formatCsvMoney(Number(invoice.amount)),
+    status: invoice.status,
+    notes: invoice.due_at ? `Due ${formatCsvDate(invoice.due_at)}` : '',
+  };
+}
+
+export async function fetchCsvExportSummary(userId: string): Promise<CsvExportSummary> {
   const [customers, leads, jobs, quotes, invoices, lineItems] = await Promise.all([
     fetchCustomers(userId, true),
     fetchLeads(userId),
@@ -90,175 +261,53 @@ export async function fetchCsvExportCounts(userId: string): Promise<CsvExportCou
     fetchAllQuoteLineItems(userId),
   ]);
 
+  const convertedLeads = leads.filter((lead) => lead.converted_customer_id);
+  const totalRows =
+    customers.length + convertedLeads.length + jobs.length + quotes.length + lineItems.length + invoices.length;
+
   return {
     clients: customers.length,
-    leads: leads.length,
+    leads: convertedLeads.length,
     jobs: jobs.length,
     quotes: quotes.length,
-    quote_line_items: lineItems.length,
+    quoteLines: lineItems.length,
     invoices: invoices.length,
+    totalRows,
   };
 }
 
-export async function buildCsvExport(userId: string, kind: CsvExportKind): Promise<CsvExportResult> {
+export async function buildUnifiedCsvExport(userId: string): Promise<CsvExportResult> {
   const exportedAt = new Date().toISOString().slice(0, 10);
-
-  switch (kind) {
-    case 'clients':
-      return buildClientsCsv(userId, exportedAt);
-    case 'leads':
-      return buildLeadsCsv(userId, exportedAt);
-    case 'jobs':
-      return buildJobsCsv(userId, exportedAt);
-    case 'quotes':
-      return buildQuotesCsv(userId, exportedAt);
-    case 'quote_line_items':
-      return buildQuoteLineItemsCsv(userId, exportedAt);
-    case 'invoices':
-      return buildInvoicesCsv(userId, exportedAt);
-  }
-}
-
-async function buildClientsCsv(userId: string, exportedAt: string): Promise<CsvExportResult> {
-  const customers = await fetchCustomers(userId, true);
-  const headers = [
-    'Name',
-    'Phone',
-    'Email',
-    'Address line 1',
-    'Address line 2',
-    'City',
-    'Postcode',
-    'Favourite',
-    'Next action',
-    'Next action due',
-    'Follow-up date',
-    'Last appointment',
-    'Last contacted',
-    'Amount paid (GBP)',
-    'Rating',
-    'Archived',
-    'Notes',
-    'Created',
-    'Updated',
-  ];
-
-  const rows = customers.map((c) => [
-    c.name,
-    c.phone,
-    c.email,
-    c.address_line1,
-    c.address_line2,
-    c.city,
-    c.postcode,
-    c.is_favourite ? 'Yes' : 'No',
-    c.next_action,
-    formatCsvDate(c.next_action_due_at),
-    formatCsvDate(c.follow_up_at),
-    formatCsvDate(c.last_appointment),
-    formatCsvDateTime(c.last_contacted_at),
-    formatCsvMoney(c.amount_paid),
-    c.rating,
-    c.archived_at ? formatCsvDate(c.archived_at) : '',
-    c.notes,
-    formatCsvDateTime(c.created_at),
-    formatCsvDateTime(c.updated_at),
-  ]);
-
-  return {
-    filename: `tradekeep-clients-${exportedAt}.csv`,
-    content: buildCsv(headers, rows),
-    rowCount: rows.length,
-  };
-}
-
-async function buildLeadsCsv(userId: string, exportedAt: string): Promise<CsvExportResult> {
-  const leads = await fetchLeads(userId);
-  const headers = [
-    'Name',
-    'Phone',
-    'Email',
-    'Requested service',
-    'Status',
-    'Converted to client',
-    'Notes',
-    'Created',
-    'Updated',
-  ];
-
-  const rows = leads.map((l: Lead) => [
-    l.name,
-    l.phone,
-    l.email,
-    l.requested_service,
-    leadStatusLabel(l.status),
-    l.converted_customer_id ? 'Yes' : 'No',
-    l.notes,
-    formatCsvDateTime(l.created_at),
-    formatCsvDateTime(l.updated_at),
-  ]);
-
-  return {
-    filename: `tradekeep-leads-${exportedAt}.csv`,
-    content: buildCsv(headers, rows),
-    rowCount: rows.length,
-  };
-}
-
-async function buildJobsCsv(userId: string, exportedAt: string): Promise<CsvExportResult> {
-  const [jobs, customers] = await Promise.all([fetchJobs(userId), fetchCustomers(userId, true)]);
-  const customerMap = new Map(customers.map((c) => [c.id, c]));
-
-  const headers = [
-    'Reference',
-    'Title',
-    'Client',
-    'Status',
-    'Scheduled',
-    'Duration (minutes)',
-    'Price (GBP)',
-    'Address',
-    'City',
-    'Postcode',
-    'Materials',
-    'Description',
-    'Notes',
-    'Created',
-    'Updated',
-  ];
-
-  const rows = jobs.map((j: Job) => [
-    j.reference,
-    j.title,
-    customerName(customerMap, j.customer_id),
-    j.status,
-    formatCsvDateTime(j.scheduled_at),
-    j.duration_minutes,
-    formatCsvMoney(j.price),
-    j.address_line1,
-    j.city,
-    j.postcode,
-    j.materials,
-    j.description,
-    j.notes,
-    formatCsvDateTime(j.created_at),
-    formatCsvDateTime(j.updated_at),
-  ]);
-
-  return {
-    filename: `tradekeep-jobs-${exportedAt}.csv`,
-    content: buildCsv(headers, rows),
-    rowCount: rows.length,
-  };
-}
-
-async function buildQuotesCsv(userId: string, exportedAt: string): Promise<CsvExportResult> {
-  const [quotes, customers, lineItems] = await Promise.all([
-    fetchQuotes(userId),
+  const [customers, leads, jobs, quotes, invoices, lineItems] = await Promise.all([
     fetchCustomers(userId, true),
+    fetchLeads(userId),
+    fetchJobs(userId),
+    fetchQuotes(userId),
+    fetchInvoices(userId),
     fetchAllQuoteLineItems(userId),
   ]);
-  const customerMap = new Map(customers.map((c) => [c.id, c]));
+
+  const leadsByCustomer = new Map<string, Lead>();
+  for (const lead of leads) {
+    if (lead.converted_customer_id) {
+      leadsByCustomer.set(lead.converted_customer_id, lead);
+    }
+  }
+
+  const jobsByCustomer = new Map<string, Job[]>();
+  for (const job of jobs) {
+    const list = jobsByCustomer.get(job.customer_id) ?? [];
+    list.push(job);
+    jobsByCustomer.set(job.customer_id, list);
+  }
+
+  const quotesByCustomer = new Map<string, Quote[]>();
+  for (const quote of quotes) {
+    const list = quotesByCustomer.get(quote.customer_id) ?? [];
+    list.push(quote);
+    quotesByCustomer.set(quote.customer_id, list);
+  }
+
   const lineItemsByQuote = new Map<string, QuoteLineItem[]>();
   for (const item of lineItems) {
     const list = lineItemsByQuote.get(item.quote_id) ?? [];
@@ -266,107 +315,43 @@ async function buildQuotesCsv(userId: string, exportedAt: string): Promise<CsvEx
     lineItemsByQuote.set(item.quote_id, list);
   }
 
-  const headers = [
-    'Reference',
-    'Title',
-    'Client',
-    'Status',
-    'Amount (GBP)',
-    'Valid until',
-    'Line items summary',
-    'Description',
-    'Created',
-    'Updated',
-  ];
+  const invoicesByCustomer = new Map<string, Invoice[]>();
+  for (const invoice of invoices) {
+    const list = invoicesByCustomer.get(invoice.customer_id) ?? [];
+    list.push(invoice);
+    invoicesByCustomer.set(invoice.customer_id, list);
+  }
 
-  const rows = quotes.map((q: Quote) => [
-    q.reference,
-    q.title,
-    customerName(customerMap, q.customer_id),
-    q.status,
-    formatCsvMoney(Number(q.amount)),
-    formatCsvDate(q.valid_until),
-    lineItemsSummary(lineItemsByQuote.get(q.id) ?? []),
-    q.description,
-    formatCsvDateTime(q.created_at),
-    formatCsvDateTime(q.updated_at),
-  ]);
+  const rows: ExportRow[] = [];
 
-  return {
-    filename: `tradekeep-quotes-${exportedAt}.csv`,
-    content: buildCsv(headers, rows),
-    rowCount: rows.length,
-  };
-}
+  for (const customer of customers) {
+    rows.push(buildClientRow(customer));
 
-async function buildQuoteLineItemsCsv(userId: string, exportedAt: string): Promise<CsvExportResult> {
-  const [lineItems, quotes, customers] = await Promise.all([
-    fetchAllQuoteLineItems(userId),
-    fetchQuotes(userId),
-    fetchCustomers(userId, true),
-  ]);
-  const quoteMap = new Map(quotes.map((q) => [q.id, q]));
-  const customerMap = new Map(customers.map((c) => [c.id, c]));
+    const lead = leadsByCustomer.get(customer.id);
+    if (lead) rows.push(buildLeadRow(customer, lead));
 
-  const headers = ['Quote reference', 'Quote title', 'Client', 'Line item', 'Amount (GBP)', 'Sort order'];
+    for (const job of jobsByCustomer.get(customer.id) ?? []) {
+      rows.push(buildJobRow(customer, job));
+    }
 
-  const rows = lineItems.map((item) => {
-    const quote = quoteMap.get(item.quote_id);
-    return [
-      quote?.reference ?? '',
-      quote?.title ?? '',
-      quote ? customerName(customerMap, quote.customer_id) : '',
-      item.label,
-      formatCsvMoney(Number(item.amount)),
-      item.sort_order,
-    ];
-  });
+    for (const quote of quotesByCustomer.get(customer.id) ?? []) {
+      rows.push(buildQuoteRow(customer, quote));
+      for (const item of lineItemsByQuote.get(quote.id) ?? []) {
+        rows.push(buildQuoteLineRow(customer, quote, item));
+      }
+    }
+
+    for (const invoice of invoicesByCustomer.get(customer.id) ?? []) {
+      rows.push(buildInvoiceRow(customer, invoice));
+    }
+  }
+
+  const sortedRows = sortExportRows(rows);
+  const csvRows = sortedRows.map(exportRowToCsv);
 
   return {
-    filename: `tradekeep-quote-line-items-${exportedAt}.csv`,
-    content: buildCsv(headers, rows),
-    rowCount: rows.length,
+    filename: `TradeKeepCRM-export-${exportedAt}.csv`,
+    content: buildCsv(CSV_HEADERS, csvRows),
+    rowCount: csvRows.length,
   };
 }
-
-async function buildInvoicesCsv(userId: string, exportedAt: string): Promise<CsvExportResult> {
-  const [invoices, customers] = await Promise.all([fetchInvoices(userId), fetchCustomers(userId, true)]);
-  const customerMap = new Map(customers.map((c) => [c.id, c]));
-
-  const headers = [
-    'Reference',
-    'Title',
-    'Client',
-    'Status',
-    'Amount (GBP)',
-    'Due date',
-    'Created',
-    'Updated',
-  ];
-
-  const rows = invoices.map((i: Invoice) => [
-    i.reference,
-    i.title,
-    customerName(customerMap, i.customer_id),
-    i.status,
-    formatCsvMoney(Number(i.amount)),
-    formatCsvDate(i.due_at),
-    formatCsvDateTime(i.created_at),
-    formatCsvDateTime(i.updated_at),
-  ]);
-
-  return {
-    filename: `tradekeep-invoices-${exportedAt}.csv`,
-    content: buildCsv(headers, rows),
-    rowCount: rows.length,
-  };
-}
-
-export const CSV_EXPORT_OPTIONS: { kind: CsvExportKind; label: string; description: string }[] = [
-  { kind: 'clients', label: 'Clients', description: 'Contact details, follow-ups and notes' },
-  { kind: 'leads', label: 'Leads', description: 'Enquiries and conversion status' },
-  { kind: 'jobs', label: 'Jobs', description: 'Schedule, pricing and job details' },
-  { kind: 'quotes', label: 'Quotes', description: 'Totals with line item summary' },
-  { kind: 'quote_line_items', label: 'Quote line items', description: 'Individual quote breakdown rows' },
-  { kind: 'invoices', label: 'Invoices', description: 'Amounts, status and due dates' },
-];

@@ -143,7 +143,7 @@ export default function MoreScreen() {
 
       <Text style={styles.sectionTitle}>Export data</Text>
       <Pressable style={styles.row} onPress={() => router.push('/export' as never)}>
-        <Text style={styles.rowText}>Export CSV & backup</Text>
+        <Text style={styles.rowText}>Export CSV</Text>
       </Pressable>
       <Pressable style={styles.row} onPress={handleRestore}><Text style={styles.rowText}>Restore purchases</Text></Pressable>
       <Pressable style={styles.row} onPress={handleSignOut}><Text style={[styles.rowText, styles.destructive]}>Sign out</Text></Pressable>

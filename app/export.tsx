@@ -8,127 +8,81 @@ import { Card } from '@/components/Card';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 import { colors, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { exportUserData } from '@/lib/customers';
-import {
-  buildCsvExport,
-  CSV_EXPORT_OPTIONS,
-  fetchCsvExportCounts,
-  type CsvExportCounts,
-  type CsvExportKind,
-} from '@/lib/csvExport';
+import { buildUnifiedCsvExport, fetchCsvExportSummary, type CsvExportSummary } from '@/lib/csvExport';
 
 export default function ExportScreen() {
   const { user } = useAuth();
-  const [counts, setCounts] = useState<CsvExportCounts | null>(null);
-  const [loadingCounts, setLoadingCounts] = useState(true);
-  const [exportingKind, setExportingKind] = useState<CsvExportKind | 'json' | null>(null);
+  const [summary, setSummary] = useState<CsvExportSummary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       if (!user?.id) return;
-      setLoadingCounts(true);
-      fetchCsvExportCounts(user.id)
-        .then(setCounts)
+      setLoadingSummary(true);
+      fetchCsvExportSummary(user.id)
+        .then(setSummary)
         .catch((error) => {
           console.error(error);
           Alert.alert('Could not load data', 'Try again in a moment.');
         })
-        .finally(() => setLoadingCounts(false));
+        .finally(() => setLoadingSummary(false));
     }, [user?.id]),
   );
 
-  const shareFile = async (path: string, mimeType: string) => {
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(path, { mimeType, UTI: mimeType === 'text/csv' ? 'public.comma-separated-values-text' : 'public.json' });
-    } else {
-      Alert.alert('Exported', 'File saved to app cache.');
-    }
-  };
-
-  const handleCsvExport = async (kind: CsvExportKind) => {
+  const handleExport = async () => {
     if (!user?.id) return;
-    setExportingKind(kind);
+    setExporting(true);
     try {
-      const result = await buildCsvExport(user.id, kind);
+      const result = await buildUnifiedCsvExport(user.id);
       const path = `${FileSystem.cacheDirectory}${result.filename}`;
       await FileSystem.writeAsStringAsync(path, result.content);
-      await shareFile(path, 'text/csv');
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(path, {
+          mimeType: 'text/csv',
+          UTI: 'public.comma-separated-values-text',
+        });
+      } else {
+        Alert.alert('Exported', 'File saved to app cache.');
+      }
     } catch (error) {
       Alert.alert('Export failed', error instanceof Error ? error.message : 'Unknown error');
     } finally {
-      setExportingKind(null);
-    }
-  };
-
-  const handleJsonExport = async () => {
-    if (!user?.id) return;
-    setExportingKind('json');
-    try {
-      const data = await exportUserData(user.id);
-      const exportedAt = new Date().toISOString().slice(0, 10);
-      const path = `${FileSystem.cacheDirectory}tradekeep-export-${exportedAt}.json`;
-      await FileSystem.writeAsStringAsync(path, JSON.stringify(data, null, 2));
-      await shareFile(path, 'application/json');
-    } catch (error) {
-      Alert.alert('Export failed', error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      setExportingKind(null);
+      setExporting(false);
     }
   };
 
   return (
     <KeyboardSafeScroll contentContainerStyle={styles.content} bottomInset={80} wrapStyle={styles.container}>
       <Text style={styles.intro}>
-        Export your CRM data as CSV files for spreadsheets, accounting tools or backup. Amounts use GBP with two
-        decimal places; dates use UK format (DD/MM/YYYY).
+        Export all client data in one spreadsheet-friendly CSV. Each row is a client, job, quote, invoice or linked
+        lead. Amounts use GBP with two decimal places; dates use UK format (DD/MM/YYYY).
       </Text>
 
-      <Text style={styles.sectionTitle}>CSV exports</Text>
       <Card style={styles.card}>
-        {loadingCounts ? (
+        {loadingSummary ? (
           <ActivityIndicator color={colors.textPrimary} style={styles.loader} />
         ) : (
-          CSV_EXPORT_OPTIONS.map((option, index) => (
-            <View key={option.kind}>
-              {index > 0 ? <View style={styles.divider} /> : null}
-              <Pressable
-                style={styles.row}
-                onPress={() => handleCsvExport(option.kind)}
-                disabled={exportingKind !== null}
-              >
-                <View style={styles.rowText}>
-                  <Text style={styles.rowTitle}>{option.label}</Text>
-                  <Text style={styles.rowDescription}>{option.description}</Text>
-                  <Text style={styles.rowMeta}>
-                    {counts?.[option.kind] ?? 0} record{(counts?.[option.kind] ?? 0) === 1 ? '' : 's'}
-                  </Text>
-                </View>
-                {exportingKind === option.kind ? (
-                  <ActivityIndicator color={colors.textSecondary} />
-                ) : (
-                  <Text style={styles.exportLabel}>Export</Text>
-                )}
-              </Pressable>
-            </View>
-          ))
-        )}
-      </Card>
-
-      <Text style={styles.sectionTitle}>Full backup</Text>
-      <Card style={styles.card}>
-        <Pressable style={styles.row} onPress={handleJsonExport} disabled={exportingKind !== null}>
-          <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>Export all data (JSON)</Text>
-            <Text style={styles.rowDescription}>
-              Complete backup including payments and tags. Best for restoring into TradeKeep.
+          <>
+            <Text style={styles.summaryTitle}>Ready to export</Text>
+            <Text style={styles.summaryText}>
+              {summary?.clients ?? 0} client{(summary?.clients ?? 0) === 1 ? '' : 's'} · {summary?.totalRows ?? 0} row
+              {(summary?.totalRows ?? 0) === 1 ? '' : 's'}
             </Text>
-          </View>
-          {exportingKind === 'json' ? (
-            <ActivityIndicator color={colors.textSecondary} />
-          ) : (
-            <Text style={styles.exportLabel}>Export</Text>
-          )}
-        </Pressable>
+            <Text style={styles.summaryDetail}>
+              Includes jobs ({summary?.jobs ?? 0}), quotes ({summary?.quotes ?? 0}), quote lines (
+              {summary?.quoteLines ?? 0}), invoices ({summary?.invoices ?? 0}) and converted leads (
+              {summary?.leads ?? 0}).
+            </Text>
+            <Pressable style={styles.exportButton} onPress={handleExport} disabled={exporting}>
+              {exporting ? (
+                <ActivityIndicator color={colors.ctaText} />
+              ) : (
+                <Text style={styles.exportButtonText}>Export CSV</Text>
+              )}
+            </Pressable>
+          </>
+        )}
       </Card>
     </KeyboardSafeScroll>
   );
@@ -138,20 +92,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.md, paddingBottom: 40 },
   intro: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.md },
-  sectionTitle: {
-    ...typography.label,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    marginTop: spacing.md,
-    textTransform: 'uppercase',
-  },
   card: { marginBottom: spacing.md },
   loader: { paddingVertical: spacing.lg },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm },
-  rowText: { flex: 1, paddingRight: spacing.md },
-  rowTitle: { ...typography.body, color: colors.textPrimary, fontWeight: '600' },
-  rowDescription: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
-  rowMeta: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
-  exportLabel: { ...typography.label, color: colors.textPrimary, fontWeight: '700' },
-  divider: { height: 1, backgroundColor: colors.borderSubtle, marginVertical: spacing.xs },
+  summaryTitle: { ...typography.body, color: colors.textPrimary, fontWeight: '700', marginBottom: spacing.xs },
+  summaryText: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.xs },
+  summaryDetail: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.md },
+  exportButton: {
+    backgroundColor: colors.ctaBackground,
+    borderRadius: 10,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  exportButtonText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
 });
