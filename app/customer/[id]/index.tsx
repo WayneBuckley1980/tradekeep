@@ -235,9 +235,6 @@ export default function CustomerWorkspaceScreen() {
             <Pressable style={styles.detailsLink} onPress={() => router.push(`/customer/${customer.id}/details`)}>
               <Text style={styles.detailsLinkText}>Client details & timeline →</Text>
             </Pressable>
-            <Pressable style={styles.homeLink} onPress={() => router.replace('/(tabs)/home')}>
-              <Text style={styles.homeLinkText}>← Back to Home</Text>
-            </Pressable>
           </View>
         }
       />
@@ -281,6 +278,4 @@ const styles = StyleSheet.create({
   secondaryBtnText: { ...typography.label, color: colors.textPrimary, fontWeight: '600', fontSize: 13 },
   detailsLink: { alignItems: 'center', paddingVertical: spacing.sm },
   detailsLinkText: { ...typography.body, color: colors.textSecondary, fontWeight: '600' },
-  homeLink: { alignItems: 'center', paddingVertical: spacing.sm, marginBottom: spacing.lg },
-  homeLinkText: { ...typography.label, color: colors.textPrimary, fontWeight: '600' },
 });

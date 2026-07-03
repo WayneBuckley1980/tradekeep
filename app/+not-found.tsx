@@ -1,6 +1,7 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Stack } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { goHome } from '@/components/BackToHomeButton';
 import { colors, spacing, typography } from '@/constants/theme';
 
 export default function NotFoundScreen() {
@@ -9,9 +10,9 @@ export default function NotFoundScreen() {
       <Stack.Screen options={{ title: 'Not found' }} />
       <View style={styles.container}>
         <Text style={styles.title}>Screen not found</Text>
-        <Link href="/" style={styles.link}>
+        <Pressable onPress={goHome} style={styles.link}>
           <Text style={styles.linkText}>Go home</Text>
-        </Link>
+        </Pressable>
       </View>
     </>
   );
