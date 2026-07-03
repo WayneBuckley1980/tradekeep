@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import { colors, inputStyle, spacing } from '@/constants/theme';
+import { spacing } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type SearchBarProps = {
   value: string;
@@ -13,6 +15,22 @@ export function SearchBar({
   onChangeText,
   placeholder = 'Search clients',
 }: SearchBarProps) {
+  const { colors, inputStyle } = useTheme();
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        wrapper: {
+          paddingHorizontal: spacing.md,
+          paddingBottom: spacing.sm,
+        },
+        input: {
+          ...inputStyle,
+        },
+      }),
+    [inputStyle],
+  );
+
   return (
     <View style={styles.wrapper}>
       <TextInput
@@ -28,13 +46,3 @@ export function SearchBar({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  input: {
-    ...inputStyle,
-  },
-});

@@ -3,9 +3,11 @@ import { Tabs } from 'expo-router';
 
 import { BrandTitle } from '@/components/BrandTitle';
 import { GlobalFab } from '@/components/GlobalFab';
-import { colors } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function TabLayout() {
+  const { colors } = useTheme();
+
   return (
     <View style={{ flex: 1 }}>
       <Tabs

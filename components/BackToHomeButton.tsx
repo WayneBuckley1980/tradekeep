@@ -1,13 +1,12 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { router } from 'expo-router';
 
-import { colors, spacing, typography } from '@/constants/theme';
-
-export function goHome() {
-  router.replace('/(tabs)/home');
-}
+import { spacing, typography } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { goHome } from '@/lib/navigation';
 
 export function BackToHomeButton() {
+  const { colors } = useTheme();
+
   return (
     <Pressable
       onPress={goHome}
@@ -16,7 +15,7 @@ export function BackToHomeButton() {
       accessibilityRole="button"
       accessibilityLabel="Back to home"
     >
-      <Text style={styles.label}>Home</Text>
+      <Text style={[styles.label, { color: colors.textPrimary }]}>Home</Text>
     </Pressable>
   );
 }
@@ -33,6 +32,5 @@ const styles = StyleSheet.create({
   label: {
     ...typography.label,
     fontWeight: '600',
-    color: colors.textPrimary,
   },
 });

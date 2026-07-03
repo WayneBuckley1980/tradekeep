@@ -6,12 +6,14 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthProvider } from '@/contexts/AuthContext';
-import { stackScreenOptions } from '@/lib/stackScreenOptions';
+import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { themedStackScreenOptions } from '@/lib/stackScreenOptions';
 
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootNavigator() {
   const router = useRouter();
+  const { colors, colorScheme } = useTheme();
 
   useEffect(() => {
     SplashScreen.hideAsync();
@@ -29,10 +31,9 @@ export default function RootLayout() {
   }, [router]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-    <AuthProvider>
-      <StatusBar style="light" />
-      <Stack screenOptions={stackScreenOptions}>
+    <>
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      <Stack screenOptions={themedStackScreenOptions(colors)}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="auth" options={{ headerShown: false }} />
@@ -52,7 +53,18 @@ export default function RootLayout() {
         <Stack.Screen name="export" options={{ title: 'Export data' }} />
         <Stack.Screen name="paywall" options={{ title: 'Upgrade', presentation: 'modal' }} />
       </Stack>
-    </AuthProvider>
+    </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <AuthProvider>
+          <RootNavigator />
+        </AuthProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

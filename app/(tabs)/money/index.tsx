@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,8 +15,9 @@ import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { StatusBadge } from '@/components/StatusBadge';
 import { SwipeToDelete } from '@/components/SwipeToDelete';
-import { colors, spacing, typography } from '@/constants/theme';
+import { spacing, typography, type ThemeColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { fetchCustomers } from '@/lib/customers';
 import { deleteInvoice, effectiveInvoiceStatus, fetchInvoices } from '@/lib/invoices';
 import { fetchMoneyStats, formatMoney } from '@/lib/money';
@@ -29,6 +30,8 @@ type MoneySection = (typeof SECTIONS)[number];
 
 export default function MoneyScreen() {
   const { user } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [section, setSection] = useState<MoneySection>('overview');
   const [stats, setStats] = useState({ outstanding: 0, paidThisMonth: 0, paidThisYear: 0, averageJobValue: 0 });
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -193,7 +196,8 @@ export default function MoneyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   tabs: { maxHeight: 48, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
@@ -213,4 +217,5 @@ const styles = StyleSheet.create({
   rowTitle: { ...typography.body, color: colors.textPrimary, fontWeight: '600', flex: 1 },
   rowSub: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
   rowAmount: { ...typography.label, color: colors.textPrimary, marginTop: spacing.xs },
-});
+  });
+}

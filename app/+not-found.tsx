@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { goHome } from '@/components/BackToHomeButton';
+import { goHome } from '@/lib/navigation';
 import { colors, spacing, typography } from '@/constants/theme';
 
 export default function NotFoundScreen() {

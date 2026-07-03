@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,8 +17,9 @@ import { CustomerRow } from '@/components/CustomerRow';
 import { EmptyState } from '@/components/EmptyState';
 import { SearchBar } from '@/components/SearchBar';
 import { SwipeToDelete } from '@/components/SwipeToDelete';
-import { colors, FREE_TIER_LIMIT, spacing, typography } from '@/constants/theme';
+import { FREE_TIER_LIMIT, spacing, typography, type ThemeColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useTerminology } from '@/hooks/useTerminology';
 import { fetchCustomers, updateProfile, deleteCustomer } from '@/lib/customers';
 import { filterCustomers, groupCustomers, sortCustomers } from '@/lib/customerGroups';
@@ -29,6 +30,8 @@ import type { BusinessType, Customer, Lead } from '@/types/database';
 
 export default function HomeScreen() {
   const { user, isPro, profile, refreshProfile } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const terms = useTerminology();
   const needsBusinessType = !profile?.business_type;
 
@@ -226,7 +229,8 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   typeBar: { paddingTop: spacing.sm, paddingBottom: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
@@ -255,4 +259,5 @@ const styles = StyleSheet.create({
   convertText: { ...typography.caption, color: colors.textPrimary, fontWeight: '700' },
   addLead: { backgroundColor: colors.ctaBackground, borderRadius: 10, padding: spacing.md, alignItems: 'center', marginBottom: spacing.md },
   addLeadText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
-});
+  });
+}

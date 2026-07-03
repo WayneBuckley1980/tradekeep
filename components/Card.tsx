@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
 
-import { cardStyle, spacing } from '@/constants/theme';
+import { spacing } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type CardProps = {
   children: React.ReactNode;
@@ -8,12 +10,17 @@ type CardProps = {
 };
 
 export function Card({ children, style }: CardProps) {
+  const { cardStyle } = useTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        card: {
+          ...cardStyle,
+          padding: spacing.md,
+        },
+      }),
+    [cardStyle],
+  );
+
   return <View style={[styles.card, style]}>{children}</View>;
 }
-
-const styles = StyleSheet.create({
-  card: {
-    ...cardStyle,
-    padding: spacing.md,
-  },
-});
