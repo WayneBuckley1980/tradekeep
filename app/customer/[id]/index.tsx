@@ -11,8 +11,6 @@ import {
 } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 
-import { goHome } from '@/lib/navigation';
-
 import { Card } from '@/components/Card';
 import { ContactActions } from '@/components/CustomerRow';
 import { EmptyState } from '@/components/EmptyState';
@@ -159,7 +157,7 @@ export default function CustomerWorkspaceScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.body}>Client not found.</Text>
-        <Pressable onPress={goHome}>
+        <Pressable onPress={() => router.replace('/(tabs)/home')}>
           <Text style={styles.link}>Back to Home</Text>
         </Pressable>
       </View>

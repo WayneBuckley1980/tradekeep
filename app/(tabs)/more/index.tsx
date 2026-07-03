@@ -1,11 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Card } from '@/components/Card';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
-import { FREE_TIER_LIMIT, spacing, typography, type ThemeColors } from '@/constants/theme';
+import { colors, FREE_TIER_LIMIT, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme, type ThemePreference } from '@/contexts/ThemeContext';
 import { useTerminology } from '@/hooks/useTerminology';
 import { updateProfile } from '@/lib/customers';
 import { restorePurchases } from '@/lib/purchases';
@@ -13,68 +12,8 @@ import { createTag, deleteTag, ensureDefaultTags, fetchTags } from '@/lib/tags';
 import { BUSINESS_TYPES, WORK_LOCATIONS } from '@/lib/terminology';
 import type { BusinessType, Tag, WorkLocationType } from '@/types/database';
 
-const THEME_OPTIONS: { id: ThemePreference; label: string }[] = [
-  { id: 'system', label: 'System' },
-  { id: 'light', label: 'Light' },
-  { id: 'dark', label: 'Dark' },
-];
-
-function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    content: { padding: spacing.md, paddingBottom: 120 },
-    sectionTitle: { ...typography.label, color: colors.textSecondary, marginBottom: spacing.sm, marginTop: spacing.md, textTransform: 'uppercase' },
-    card: { marginBottom: spacing.md },
-    input: {
-      backgroundColor: colors.surfaceElevated,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
-      borderRadius: 8,
-      color: colors.textPrimary,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm + 4,
-      fontSize: 16,
-      marginBottom: spacing.sm,
-    },
-    btn: { backgroundColor: colors.ctaBackground, borderRadius: 10, padding: spacing.md, alignItems: 'center' },
-    smallBtn: { backgroundColor: colors.ctaBackground, borderRadius: 10, padding: spacing.md, marginLeft: spacing.sm },
-    btnText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
-    tagRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
-    tagName: { ...typography.body, fontWeight: '600' },
-    deleteTag: { ...typography.caption, color: colors.statusOverdue },
-    tagAdd: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
-    hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
-    typeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs, gap: spacing.sm },
-    typeIcon: { fontSize: 20 },
-    typeLabel: { ...typography.body, color: colors.textSecondary, flex: 1 },
-    typeSelected: { color: colors.textPrimary, fontWeight: '700' },
-    label: { ...typography.caption, color: colors.textSecondary },
-    value: { ...typography.body, color: colors.textPrimary, marginTop: spacing.xs },
-    spaced: { marginTop: spacing.md },
-    link: { ...typography.label, color: colors.textPrimary, marginTop: spacing.sm, fontWeight: '600' },
-    row: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 12, padding: spacing.md, marginBottom: spacing.sm },
-    rowText: { ...typography.body, color: colors.textPrimary },
-    destructive: { color: colors.statusOverdue },
-    footer: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.lg },
-    themeRow: { flexDirection: 'row', gap: spacing.sm },
-    themeOption: {
-      flex: 1,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
-      borderRadius: 10,
-      padding: spacing.sm,
-      alignItems: 'center',
-    },
-    themeOptionSelected: { borderColor: colors.textPrimary, backgroundColor: colors.surfaceElevated },
-    themeOptionText: { ...typography.label, color: colors.textSecondary },
-    themeOptionTextSelected: { color: colors.textPrimary, fontWeight: '700' },
-  });
-}
-
 export default function MoreScreen() {
   const { user, isPro, profile, signOut, refreshProfile } = useAuth();
-  const { colors, preference, setPreference } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const terms = useTerminology();
   const [tags, setTags] = useState<Tag[]>([]);
   const [businessName, setBusinessName] = useState('');
@@ -144,24 +83,6 @@ export default function MoreScreen() {
 
   return (
     <KeyboardSafeScroll contentContainerStyle={styles.content} bottomInset={160} wrapStyle={styles.container}>
-      <Text style={styles.sectionTitle}>Appearance</Text>
-      <Card style={styles.card}>
-        <Text style={styles.hint}>Choose light, dark, or match your device setting.</Text>
-        <View style={styles.themeRow}>
-          {THEME_OPTIONS.map((option) => (
-            <Pressable
-              key={option.id}
-              style={[styles.themeOption, preference === option.id && styles.themeOptionSelected]}
-              onPress={() => void setPreference(option.id)}
-            >
-              <Text style={[styles.themeOptionText, preference === option.id && styles.themeOptionTextSelected]}>
-                {option.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </Card>
-
       <Text style={styles.sectionTitle}>Business type</Text>
       <Card style={styles.card}>
         <Text style={styles.hint}>Changes labels across the app ({terms.job}, {terms.client}, etc.)</Text>
@@ -204,7 +125,7 @@ export default function MoreScreen() {
           </View>
         ))}
         <View style={styles.tagAdd}>
-          <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={newTag} onChangeText={setNewTag} placeholder="New tag" placeholderTextColor={colors.textMuted} />
+          <TextInput style={[styles.input, { flex: 1 }]} value={newTag} onChangeText={setNewTag} placeholder="New tag" placeholderTextColor={colors.textMuted} />
           <Pressable style={styles.smallBtn} onPress={addTag}><Text style={styles.btnText}>Add</Text></Pressable>
         </View>
       </Card>
@@ -231,3 +152,31 @@ export default function MoreScreen() {
     </KeyboardSafeScroll>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.md, paddingBottom: 120 },
+  sectionTitle: { ...typography.label, color: colors.textSecondary, marginBottom: spacing.sm, marginTop: spacing.md, textTransform: 'uppercase' },
+  card: { marginBottom: spacing.md },
+  input: { ...inputStyle, marginBottom: spacing.sm },
+  btn: { backgroundColor: colors.ctaBackground, borderRadius: 10, padding: spacing.md, alignItems: 'center' },
+  smallBtn: { backgroundColor: colors.ctaBackground, borderRadius: 10, padding: spacing.md, marginLeft: spacing.sm },
+  btnText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
+  tagRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
+  tagName: { ...typography.body, fontWeight: '600' },
+  deleteTag: { ...typography.caption, color: colors.statusOverdue },
+  tagAdd: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
+  hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
+  typeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs, gap: spacing.sm },
+  typeIcon: { fontSize: 20 },
+  typeLabel: { ...typography.body, color: colors.textSecondary, flex: 1 },
+  typeSelected: { color: colors.textPrimary, fontWeight: '700' },
+  label: { ...typography.caption, color: colors.textSecondary },
+  value: { ...typography.body, color: colors.textPrimary, marginTop: spacing.xs },
+  spaced: { marginTop: spacing.md },
+  link: { ...typography.label, color: colors.textPrimary, marginTop: spacing.sm, fontWeight: '600' },
+  row: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 12, padding: spacing.md, marginBottom: spacing.sm },
+  rowText: { ...typography.body, color: colors.textPrimary },
+  destructive: { color: colors.statusOverdue },
+  footer: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.lg },
+});

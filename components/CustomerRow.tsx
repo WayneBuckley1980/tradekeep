@@ -1,12 +1,10 @@
-import { useMemo } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Linking } from 'react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 
 import { Card } from '@/components/Card';
-import { radii, spacing, typography, type ThemeColors } from '@/constants/theme';
-import { useTheme } from '@/contexts/ThemeContext';
+import { colors, radii, spacing, typography } from '@/constants/theme';
 import { followUpLabel, formatRelativeDate, getFollowUpUrgency } from '@/lib/dates';
 import { formatAddress } from '@/lib/search';
 import type { Customer } from '@/types/database';
@@ -16,27 +14,7 @@ type CustomerRowProps = {
   balanceOwing?: number;
 };
 
-function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    row: { marginBottom: spacing.sm },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-    name: { ...typography.heading, color: colors.textPrimary, flex: 1, fontSize: 18 },
-    badge: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
-    badgeText: { ...typography.caption, color: colors.textSecondary },
-    badgeUrgent: { color: colors.textPrimary, fontWeight: '700' },
-    meta: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
-    nextAction: { ...typography.caption, color: colors.statusUpcoming, marginTop: spacing.xs, fontWeight: '600' },
-    notes: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
-    owing: { ...typography.caption, color: colors.statusOverdue, marginTop: spacing.xs, fontWeight: '600' },
-    actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-    actionBtn: { backgroundColor: colors.surfaceElevated, borderRadius: 8, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.borderSubtle },
-    actionText: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
-  });
-}
-
 export function CustomerRow({ customer, balanceOwing }: CustomerRowProps) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const urgency = getFollowUpUrgency(customer.follow_up_at);
 
   return (
@@ -66,9 +44,6 @@ export function CustomerRow({ customer, balanceOwing }: CustomerRowProps) {
 }
 
 export function ContactActions({ customer }: { customer: Customer }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
   const call = () => customer.phone && Linking.openURL(`tel:${customer.phone}`);
   const text = () => customer.phone && Linking.openURL(`sms:${customer.phone}`);
   const email = () => customer.email && Linking.openURL(`mailto:${customer.email}`);
@@ -115,3 +90,19 @@ export function ContactActions({ customer }: { customer: Customer }) {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  row: { marginBottom: spacing.sm },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  name: { ...typography.heading, color: colors.textPrimary, flex: 1, fontSize: 18 },
+  badge: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  badgeText: { ...typography.caption, color: colors.textSecondary },
+  badgeUrgent: { color: colors.textPrimary, fontWeight: '700' },
+  meta: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
+  nextAction: { ...typography.caption, color: colors.statusUpcoming, marginTop: spacing.xs, fontWeight: '600' },
+  notes: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
+  owing: { ...typography.caption, color: colors.statusOverdue, marginTop: spacing.xs, fontWeight: '600' },
+  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  actionBtn: { backgroundColor: colors.surfaceElevated, borderRadius: 8, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.borderSubtle },
+  actionText: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
+});

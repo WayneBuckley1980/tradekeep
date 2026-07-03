@@ -1,13 +1,10 @@
 import { Stack } from 'expo-router';
 
-import { useTheme } from '@/contexts/ThemeContext';
-import { themedStackScreenOptions } from '@/lib/stackScreenOptions';
+import { stackScreenOptions } from '@/lib/stackScreenOptions';
 
 export default function CustomerLayout() {
-  const { colors } = useTheme();
-
   return (
-    <Stack screenOptions={themedStackScreenOptions(colors)}>
+    <Stack screenOptions={stackScreenOptions}>
       <Stack.Screen name="index" options={{ title: 'Client workspace' }} />
       <Stack.Screen name="details" options={{ title: 'Client details' }} />
       <Stack.Screen name="edit" options={{ title: 'Edit client', presentation: 'modal' }} />

@@ -1,11 +1,9 @@
-import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
-import { spacing, typography, type ThemeColors } from '@/constants/theme';
-import { useTheme } from '@/contexts/ThemeContext';
+import { colors, spacing, typography } from '@/constants/theme';
 import { formatJobDateTime } from '@/lib/jobs';
 import { formatMoney } from '@/lib/money';
 import type { Job } from '@/types/database';
@@ -15,20 +13,7 @@ type JobRowProps = {
   customerName?: string;
 };
 
-function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    row: { marginBottom: spacing.sm },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
-    title: { ...typography.heading, color: colors.textPrimary, flex: 1, fontSize: 17 },
-    meta: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
-    price: { ...typography.label, color: colors.textPrimary, marginTop: spacing.xs },
-  });
-}
-
 export function JobRow({ job, customerName }: JobRowProps) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
   return (
     <Pressable onPress={() => router.push(`/job/${job.id}`)}>
       <Card style={styles.row}>
@@ -44,3 +29,11 @@ export function JobRow({ job, customerName }: JobRowProps) {
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  row: { marginBottom: spacing.sm },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
+  title: { ...typography.heading, color: colors.textPrimary, flex: 1, fontSize: 17 },
+  meta: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
+  price: { ...typography.label, color: colors.textPrimary, marginTop: spacing.xs },
+});

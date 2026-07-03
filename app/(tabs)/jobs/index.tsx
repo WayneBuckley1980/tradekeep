@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,9 +13,8 @@ import { useFocusEffect } from 'expo-router';
 
 import { EmptyState } from '@/components/EmptyState';
 import { JobRow } from '@/components/JobRow';
-import { spacing, typography, type ThemeColors } from '@/constants/theme';
+import { colors, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
 import { fetchCustomers } from '@/lib/customers';
 import { fetchJobs, filterJobsByTab } from '@/lib/jobs';
 import type { Customer, Job } from '@/types/database';
@@ -33,8 +32,6 @@ const TAB_LABELS: Record<JobTab, string> = {
 
 export default function JobsScreen() {
   const { user } = useAuth();
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [tab, setTab] = useState<JobTab>('today');
@@ -105,8 +102,7 @@ export default function JobsScreen() {
   );
 }
 
-function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
+const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   tabs: { maxHeight: 48, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
@@ -116,5 +112,4 @@ function createStyles(colors: ThemeColors) {
   tabText: { ...typography.caption, color: colors.textMuted },
   tabTextActive: { color: colors.textPrimary, fontWeight: '600' },
   list: { padding: spacing.md, paddingBottom: 120 },
-  });
-}
+});
