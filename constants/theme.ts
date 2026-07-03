@@ -58,4 +58,4 @@ export const inputStyle = {
   fontSize: 16,
 };
 
-export const FREE_TIER_LIMIT = 10;
+export const FREE_TIER_LIMIT = 5;

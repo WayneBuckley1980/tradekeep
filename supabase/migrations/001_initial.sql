@@ -83,7 +83,7 @@ begin
   from public.customers
   where user_id = new.user_id;
 
-  if customer_count >= 10 then
+  if customer_count >= 5 then
     raise exception 'FREE_TIER_LIMIT_REACHED';
   end if;
 

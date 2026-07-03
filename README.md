@@ -8,7 +8,7 @@ iOS CRM for solo tradespersons — barbers, cleaners, handymen, and more.
 
 - Client name, notes, last appointment, amount paid
 - Follow-up reminders (1 week before + on the day)
-- Free tier: 10 clients
+- Free tier: 5 clients
 - Pro: unlimited clients via Apple IAP (£6.99/mo or £49/yr)
 
 ## Setup

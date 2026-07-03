@@ -158,6 +158,6 @@ Events handled: purchase, renewal, cancellation, expiration → updates `profile
 
 - `react-native-purchases` SDK
 - Paywall at `/paywall` — £6.99/mo, £49/yr
-- Free tier: 10 clients
+- Free tier: 5 clients
 - Restore purchases in **More**
 - Login links RevenueCat user ID to Supabase user ID

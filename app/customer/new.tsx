@@ -47,7 +47,7 @@ export default function NewCustomerScreen() {
     if (!isPro) {
       const count = await countCustomers(user.id);
       if (count >= FREE_TIER_LIMIT) {
-        router.replace({ pathname: '/paywall', params: { reason: 'Free plan includes 10 clients.' } });
+        router.replace({ pathname: '/paywall', params: { reason: `Free plan includes ${FREE_TIER_LIMIT} clients.` } });
         throw new Error('Free tier limit reached');
       }
     }

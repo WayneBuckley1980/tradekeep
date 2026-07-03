@@ -26,7 +26,7 @@ export function GlobalFab({ bottom = 90 }: GlobalFabProps) {
           if (!isPro) {
             const count = await countCustomers(user.id);
             if (count >= FREE_TIER_LIMIT) {
-              router.push({ pathname: '/paywall', params: { reason: 'Free plan includes 10 clients.' } });
+              router.push({ pathname: '/paywall', params: { reason: `Free plan includes ${FREE_TIER_LIMIT} clients.` } });
               return;
             }
           }
