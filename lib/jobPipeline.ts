@@ -36,20 +36,30 @@ export function pipelineStatusIndex(status: JobPipelineStatus): number {
 }
 
 export function pipelineErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    const msg = error.message;
-    if (msg.includes('An invoice must be generated')) {
-      return 'Cannot mark invoiced until an invoice has been raised.';
-    }
-    if (msg.includes('Job cannot be complete until full payment')) {
-      return 'Cannot complete this job until the invoice is fully paid.';
-    }
-    if (msg.includes('Invalid pipeline transition')) {
-      return 'This status change is not allowed. Follow: Lead → Quoted → Active → Invoiced → Complete.';
-    }
-    return msg;
+  const msg =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' &&
+          error !== null &&
+          'message' in error &&
+          typeof (error as { message: unknown }).message === 'string'
+        ? (error as { message: string }).message
+        : typeof error === 'string'
+          ? error
+          : null;
+
+  if (!msg) return 'Something went wrong updating the job status.';
+
+  if (msg.includes('An invoice must be generated')) {
+    return 'Cannot mark invoiced until an invoice has been raised.';
   }
-  return 'Something went wrong updating the job status.';
+  if (msg.includes('Job cannot be complete until full payment')) {
+    return 'Cannot complete this job until the invoice is fully paid.';
+  }
+  if (msg.includes('Invalid pipeline transition')) {
+    return 'This status change is not allowed. Follow: Lead → Quoted → Active → Invoiced → Complete.';
+  }
+  return msg;
 }
 
 export type ClientPipelineFocus = {

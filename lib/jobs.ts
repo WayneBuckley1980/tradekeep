@@ -1,4 +1,5 @@
 import { generateJobReference } from '@/lib/references';
+import { nextPipelineStatus, pipelineStatusIndex } from '@/lib/jobPipeline';
 import { supabase } from '@/lib/supabase';
 import type { Job, JobInsert, JobPipelineStatus, JobStatus, JobUpdate } from '@/types/database';
 
@@ -97,6 +98,50 @@ export async function updateJobPipeline(
   pipelineStatus: Job['pipeline_status'],
 ): Promise<Job> {
   return updateJob(userId, jobId, { pipeline_status: pipelineStatus });
+}
+
+/** Advance a job one step at a time through the pipeline (required by DB trigger). */
+export async function advanceJobPipelineTo(
+  userId: string,
+  jobId: string,
+  fromStatus: JobPipelineStatus,
+  targetStatus: JobPipelineStatus,
+  finalPatch?: JobUpdate,
+): Promise<Job> {
+  const targetIdx = pipelineStatusIndex(targetStatus);
+  let status = fromStatus;
+  let job: Job | null = null;
+
+  if (pipelineStatusIndex(status) > targetIdx) {
+    if (finalPatch && Object.keys(finalPatch).length > 0) {
+      return updateJob(userId, jobId, finalPatch);
+    }
+    const existing = await fetchJob(userId, jobId);
+    if (!existing) throw new Error('Job not found');
+    return existing;
+  }
+
+  while (pipelineStatusIndex(status) < targetIdx) {
+    const next = nextPipelineStatus(status);
+    if (!next) {
+      throw new Error(`Invalid pipeline transition from ${status} toward ${targetStatus}`);
+    }
+    const reachingTarget = pipelineStatusIndex(next) === targetIdx;
+    const patch: JobUpdate =
+      reachingTarget && finalPatch ? { pipeline_status: next, ...finalPatch } : { pipeline_status: next };
+    job = await updateJob(userId, jobId, patch);
+    status = next;
+    if (reachingTarget) return job;
+  }
+
+  if (finalPatch && Object.keys(finalPatch).length > 0) {
+    return updateJob(userId, jobId, finalPatch);
+  }
+
+  if (job) return job;
+  const existing = await fetchJob(userId, jobId);
+  if (!existing) throw new Error('Job not found');
+  return existing;
 }
 
 export async function deleteJob(userId: string, jobId: string): Promise<void> {

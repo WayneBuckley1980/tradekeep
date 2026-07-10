@@ -4,6 +4,7 @@ import { generateAndEmailDocument, type DocumentDetails } from '@/lib/documents'
 import { cancelJobStartReminders, scheduleJobStartReminders } from '@/lib/jobReminders';
 import { createInvoice, updateInvoice } from '@/lib/invoices';
 import {
+  advanceJobPipelineTo,
   createJob,
   fetchJob,
   generateJobReference,
@@ -11,6 +12,7 @@ import {
   updateJob,
   updateJobPipeline,
 } from '@/lib/jobs';
+import { pipelineStatusIndex } from '@/lib/jobPipeline';
 import { createPayment } from '@/lib/payments';
 import { fetchQuoteLineItems, formatQuoteLineItemLabel } from '@/lib/quoteItems';
 import { updateQuote } from '@/lib/quotes';
@@ -85,7 +87,10 @@ export async function sendQuoteByEmail(
   });
 
   if (quote.job_id) {
-    await updateJobPipeline(userId, quote.job_id, 'quoted');
+    const job = await fetchJob(userId, quote.job_id);
+    if (job && pipelineStatusIndex(job.pipeline_status) < pipelineStatusIndex('quoted')) {
+      await advanceJobPipelineTo(userId, quote.job_id, job.pipeline_status, 'quoted');
+    }
   }
 
   return updated;
@@ -97,22 +102,12 @@ export type AcceptQuoteOptions = {
   customer: Customer;
 };
 
-async function advanceJobToActive(userId: string, jobId: string, pipelineStatus: Job['pipeline_status']): Promise<void> {
-  if (pipelineStatus === 'lead') {
-    await updateJobPipeline(userId, jobId, 'quoted');
-    await updateJobPipeline(userId, jobId, 'active');
-  } else if (pipelineStatus === 'quoted') {
-    await updateJobPipeline(userId, jobId, 'active');
-  }
-}
-
 export async function acceptQuoteAndActivateJob(
   userId: string,
   quote: Quote,
   options: AcceptQuoteOptions,
 ): Promise<Job> {
   const { startAt, addToCalendar, customer } = options;
-  await updateQuote(userId, quote.id, { status: 'accepted' });
 
   const jobFields = {
     status: 'upcoming' as const,
@@ -122,11 +117,22 @@ export async function acceptQuoteAndActivateJob(
   };
 
   let job: Job;
+
   if (quote.job_id) {
     const existing = await fetchJob(userId, quote.job_id);
     if (!existing) throw new Error('Job not found');
-    await advanceJobToActive(userId, quote.job_id, existing.pipeline_status);
-    job = await updateJob(userId, quote.job_id, jobFields);
+
+    if (pipelineStatusIndex(existing.pipeline_status) > pipelineStatusIndex('active')) {
+      throw new Error('This job has already been invoiced or completed.');
+    }
+
+    job = await advanceJobPipelineTo(
+      userId,
+      quote.job_id,
+      existing.pipeline_status,
+      'active',
+      jobFields,
+    );
   } else {
     job = await createJob(userId, {
       customer_id: quote.customer_id,
@@ -154,8 +160,12 @@ export async function acceptQuoteAndActivateJob(
       quote_id: quote.id,
       property_id: null,
     });
-    await updateQuote(userId, quote.id, { job_id: job.id });
   }
+
+  await updateQuote(userId, quote.id, {
+    status: 'accepted',
+    job_id: job.id,
+  });
 
   if (addToCalendar) {
     try {
@@ -189,8 +199,8 @@ export async function raiseInvoiceForJob(
   invoicePayload: Omit<Parameters<typeof createInvoice>[1], 'job_id'>,
 ): Promise<Invoice> {
   let currentJob = job;
-  if (currentJob.pipeline_status === 'quoted') {
-    currentJob = await updateJobPipeline(userId, job.id, 'active');
+  if (pipelineStatusIndex(currentJob.pipeline_status) < pipelineStatusIndex('active')) {
+    currentJob = await advanceJobPipelineTo(userId, job.id, currentJob.pipeline_status, 'active');
   }
 
   const draft: DocumentDetails = {
