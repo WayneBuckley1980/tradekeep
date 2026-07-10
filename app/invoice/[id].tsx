@@ -6,16 +6,16 @@ import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { scheduleAfterPaidReminder, syncCustomerPaidTotal } from '@/lib/automations';
+import { pipelineErrorMessage } from '@/lib/jobPipeline';
+import { logPaymentWithReceipt } from '@/lib/jobWorkflow';
 import { fetchCustomer } from '@/lib/customers';
-import { duplicateInvoice, effectiveInvoiceStatus, fetchInvoice, updateInvoice } from '@/lib/invoices';
+import { duplicateInvoice, effectiveInvoiceStatus, fetchInvoice } from '@/lib/invoices';
 import { formatMoney } from '@/lib/money';
-import { createPayment } from '@/lib/payments';
 import { fetchQuote } from '@/lib/quotes';
 
 export default function InvoiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [invoice, setInvoice] = useState<Awaited<ReturnType<typeof fetchInvoice>>>(null);
   const [customerName, setCustomerName] = useState('');
   const [linkedQuoteRef, setLinkedQuoteRef] = useState<string | null>(null);
@@ -45,23 +45,18 @@ export default function InvoiceDetailScreen() {
   }, [load]));
 
   const recordPayment = async () => {
-    if (!user?.id || !invoice) return;
+    if (!user?.id || !invoice || !profile) return;
     const amount = Number(paymentAmount);
     if (!amount) return;
-    await createPayment(user.id, {
-      customer_id: invoice.customer_id,
-      invoice_id: invoice.id,
-      job_id: invoice.job_id,
-      amount,
-      paid_at: new Date().toISOString(),
-      method: 'bank',
-      notes: null,
-    });
-    await updateInvoice(user.id, invoice.id, { status: 'paid' });
-    await syncCustomerPaidTotal(user.id, invoice.customer_id);
-    await scheduleAfterPaidReminder(user.id, invoice.customer_id);
-    Alert.alert('Payment recorded', 'Invoice marked as paid. Client balance updated.');
-    load();
+    try {
+      const customer = await fetchCustomer(user.id, invoice.customer_id);
+      if (!customer) throw new Error('Client not found');
+      await logPaymentWithReceipt(user.id, profile, customer, invoice, amount);
+      Alert.alert('Payment recorded', 'Receipt PDF opened in your mail app. Job will close automatically.');
+      load();
+    } catch (error) {
+      Alert.alert('Could not record payment', pipelineErrorMessage(error));
+    }
   };
 
   const handleDuplicate = async () => {

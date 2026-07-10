@@ -37,6 +37,7 @@ export type NotificationIds = {
 };
 
 export type JobStatus = 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
+export type JobPipelineStatus = 'lead' | 'quoted' | 'active' | 'complete' | 'closed';
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
 export type AttachmentKind =
@@ -67,6 +68,10 @@ export type Profile = {
   business_name: string | null;
   business_phone: string | null;
   business_email: string | null;
+  business_address_line1: string | null;
+  business_address_line2: string | null;
+  business_city: string | null;
+  business_postcode: string | null;
   business_type: BusinessType | null;
   work_location: WorkLocationType;
   onboarding_completed: boolean;
@@ -160,6 +165,7 @@ export type Job = {
   city: string | null;
   postcode: string | null;
   status: JobStatus;
+  pipeline_status: JobPipelineStatus;
   price: number | null;
   materials: string | null;
   notes: string | null;
@@ -240,7 +246,9 @@ export type CustomerInsert = Omit<Customer, 'id' | 'created_at' | 'updated_at' |
 
 export type CustomerUpdate = Partial<Omit<Customer, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
 
-export type JobInsert = Omit<Job, 'id' | 'created_at' | 'updated_at' | 'user_id'>;
+export type JobInsert = Omit<Job, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'pipeline_status'> & {
+  pipeline_status?: JobPipelineStatus;
+};
 export type JobUpdate = Partial<Omit<Job, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
 
 export type QuoteInsert = Omit<Quote, 'id' | 'created_at' | 'updated_at' | 'user_id'>;

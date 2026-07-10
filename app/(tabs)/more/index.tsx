@@ -19,6 +19,10 @@ export default function MoreScreen() {
   const [businessName, setBusinessName] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
   const [businessEmail, setBusinessEmail] = useState('');
+  const [businessAddress1, setBusinessAddress1] = useState('');
+  const [businessAddress2, setBusinessAddress2] = useState('');
+  const [businessCity, setBusinessCity] = useState('');
+  const [businessPostcode, setBusinessPostcode] = useState('');
   const [businessType, setBusinessType] = useState<BusinessType | null>(null);
   const [workLocation, setWorkLocation] = useState<WorkLocationType>('visit_customers');
   const [newTag, setNewTag] = useState('');
@@ -33,6 +37,10 @@ export default function MoreScreen() {
       setBusinessName(profile?.business_name ?? '');
       setBusinessPhone(profile?.business_phone ?? '');
       setBusinessEmail(profile?.business_email ?? '');
+      setBusinessAddress1(profile?.business_address_line1 ?? '');
+      setBusinessAddress2(profile?.business_address_line2 ?? '');
+      setBusinessCity(profile?.business_city ?? '');
+      setBusinessPostcode(profile?.business_postcode ?? '');
       setBusinessType(profile?.business_type ?? null);
       setWorkLocation(profile?.work_location ?? 'visit_customers');
     }, [user?.id, profile]),
@@ -47,6 +55,10 @@ export default function MoreScreen() {
       business_name: businessName.trim() || null,
       business_phone: businessPhone.trim() || null,
       business_email: businessEmail.trim() || null,
+      business_address_line1: businessAddress1.trim() || null,
+      business_address_line2: businessAddress2.trim() || null,
+      business_city: businessCity.trim() || null,
+      business_postcode: businessPostcode.trim() || null,
       business_type: businessType,
       work_location: workLocation,
     });
@@ -105,6 +117,10 @@ export default function MoreScreen() {
         <TextInput style={styles.input} value={businessName} onChangeText={setBusinessName} placeholder="Business name" placeholderTextColor={colors.textMuted} />
         <TextInput style={styles.input} value={businessPhone} onChangeText={setBusinessPhone} placeholder="Phone" placeholderTextColor={colors.textMuted} keyboardType="phone-pad" />
         <TextInput style={styles.input} value={businessEmail} onChangeText={setBusinessEmail} placeholder="Email" placeholderTextColor={colors.textMuted} keyboardType="email-address" autoCapitalize="none" />
+        <TextInput style={styles.input} value={businessAddress1} onChangeText={setBusinessAddress1} placeholder="Business address line 1 (for PDFs)" placeholderTextColor={colors.textMuted} />
+        <TextInput style={styles.input} value={businessAddress2} onChangeText={setBusinessAddress2} placeholder="Address line 2" placeholderTextColor={colors.textMuted} />
+        <TextInput style={styles.input} value={businessCity} onChangeText={setBusinessCity} placeholder="City" placeholderTextColor={colors.textMuted} />
+        <TextInput style={styles.input} value={businessPostcode} onChangeText={setBusinessPostcode} placeholder="Postcode" placeholderTextColor={colors.textMuted} autoCapitalize="characters" />
         <Pressable style={styles.btn} onPress={saveBusiness}>
           <Text style={styles.btnText}>Save profile</Text>
         </Pressable>

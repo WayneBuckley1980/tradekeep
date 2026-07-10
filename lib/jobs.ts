@@ -1,6 +1,6 @@
 import { generateJobReference } from '@/lib/references';
 import { supabase } from '@/lib/supabase';
-import type { Job, JobInsert, JobStatus, JobUpdate } from '@/types/database';
+import type { Job, JobInsert, JobPipelineStatus, JobStatus, JobUpdate } from '@/types/database';
 
 export { generateJobReference } from '@/lib/references';
 
@@ -61,6 +61,14 @@ export async function updateJob(userId: string, jobId: string, payload: JobUpdat
 
   if (error) throw error;
   return data;
+}
+
+export async function updateJobPipeline(
+  userId: string,
+  jobId: string,
+  pipelineStatus: Job['pipeline_status'],
+): Promise<Job> {
+  return updateJob(userId, jobId, { pipeline_status: pipelineStatus });
 }
 
 export async function deleteJob(userId: string, jobId: string): Promise<void> {
@@ -127,6 +135,7 @@ export async function duplicateJob(userId: string, job: Job): Promise<Job> {
     city: job.city,
     postcode: job.postcode,
     status: 'upcoming',
+    pipeline_status: 'active',
     price: job.price,
     materials: job.materials,
     notes: job.notes,

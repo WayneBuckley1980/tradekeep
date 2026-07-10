@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { AttachmentGallery } from '@/components/AttachmentGallery';
 import { Card } from '@/components/Card';
+import { JobProgressBar } from '@/components/JobProgressBar';
 import { StatusBadge } from '@/components/StatusBadge';
 import { VoiceNotesSection } from '@/components/VoiceNotesSection';
 import { colors, spacing, typography } from '@/constants/theme';
@@ -14,17 +15,18 @@ import {
   fetchAttachmentsForJob,
   uploadAttachment,
 } from '@/lib/attachments';
-import { scheduleAfterJobReminder } from '@/lib/automations';
 import { fetchCustomer } from '@/lib/customers';
 import { fetchInvoiceForJob } from '@/lib/invoices';
-import { deleteJob, duplicateJob, fetchJob, formatJobDateTime, syncLastAppointmentFromJob, updateJob } from '@/lib/jobs';
+import { PIPELINE_LABELS, pipelineErrorMessage } from '@/lib/jobPipeline';
+import { raiseInvoiceForJob } from '@/lib/jobWorkflow';
+import { deleteJob, duplicateJob, fetchJob, formatJobDateTime } from '@/lib/jobs';
 import { formatMoney } from '@/lib/money';
 import { linkJobToProperty } from '@/lib/properties';
 import type { Attachment, Invoice, Job } from '@/types/database';
 
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [job, setJob] = useState<Job | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [jobInvoice, setJobInvoice] = useState<Invoice | null>(null);
@@ -106,31 +108,39 @@ export default function JobDetailScreen() {
     router.push({ pathname: '/quote/new', params: { jobId: job.id } });
   };
 
-  const openCreateInvoice = () => {
-    if (!job) return;
+  const openCreateInvoice = async () => {
+    if (!user?.id || !job || !profile) return;
     if (jobInvoice) {
       router.push(`/invoice/${jobInvoice.id}`);
       return;
     }
-    router.push({ pathname: '/invoice/new', params: { jobId: job.id } });
-  };
-
-  const markComplete = async () => {
-    if (!user?.id || !job) return;
-    const updated = await updateJob(user.id, job.id, { status: 'completed' });
-    await syncLastAppointmentFromJob(user.id, job.customer_id, updated);
-    await scheduleAfterJobReminder(user.id, job.customer_id, updated.scheduled_at);
-    setJob(updated);
-
-    if (jobInvoice) return;
-
-    Alert.alert('Job completed', 'Create an invoice from this job?', [
-      { text: 'Not now', style: 'cancel' },
-      {
-        text: 'Create invoice',
-        onPress: () => router.push({ pathname: '/invoice/new', params: { jobId: updated.id } }),
-      },
-    ]);
+    if (job.pipeline_status !== 'active' && job.pipeline_status !== 'quoted') {
+      Alert.alert(
+        'Not ready to invoice',
+        job.pipeline_status === 'complete' || job.pipeline_status === 'closed'
+          ? 'This job has already been invoiced or closed.'
+          : 'Send and accept a quote first so the job is Active, then raise the invoice.',
+      );
+      return;
+    }
+    const customer = await fetchCustomer(user.id, job.customer_id);
+    if (!customer) return;
+    try {
+      const invoice = await raiseInvoiceForJob(user.id, profile, customer, job, {
+        customer_id: job.customer_id,
+        quote_id: job.quote_id,
+        reference: null,
+        title: job.title,
+        amount: job.price ?? 0,
+        status: 'sent',
+        due_at: null,
+      });
+      Alert.alert('Invoice raised', 'Job marked complete. Mail app opened with invoice PDF.');
+      load();
+      router.push(`/invoice/${invoice.id}`);
+    } catch (error) {
+      Alert.alert('Could not raise invoice', pipelineErrorMessage(error));
+    }
   };
 
   if (loading || !job) {
@@ -139,9 +149,10 @@ export default function JobDetailScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <JobProgressBar currentStatus={job.pipeline_status} />
       <View style={styles.header}>
         <Text style={styles.title}>{job.title}</Text>
-        <StatusBadge label={job.status.replace('_', ' ')} status={job.status} />
+        <StatusBadge label={PIPELINE_LABELS[job.pipeline_status]} status={job.pipeline_status} />
       </View>
       {job.reference ? <Text style={styles.meta}>{job.reference}</Text> : null}
       <Text style={styles.meta}>{formatJobDateTime(job.scheduled_at)}</Text>
@@ -155,10 +166,9 @@ export default function JobDetailScreen() {
         {job.address_line1 ? <Text style={styles.meta}>{[job.address_line1, job.city, job.postcode].filter(Boolean).join(', ')}</Text> : null}
       </Card>
 
-      <Pressable style={styles.btn} onPress={markComplete}><Text style={styles.btnText}>Mark completed ✔</Text></Pressable>
       <Pressable style={styles.btnSecondary} onPress={openCreateQuote}><Text style={styles.btnSecondaryText}>Create quote</Text></Pressable>
-      <Pressable style={[styles.btnSecondary, jobInvoice && styles.btnDisabled]} onPress={openCreateInvoice}>
-        <Text style={styles.btnSecondaryText}>{jobInvoice ? `Invoiced (${jobInvoice.reference})` : 'Create invoice'}</Text>
+      <Pressable style={[styles.btn, jobInvoice && styles.btnDisabled]} onPress={openCreateInvoice}>
+        <Text style={styles.btnText}>{jobInvoice ? `Invoiced (${jobInvoice.reference})` : 'Raise invoice PDF & email'}</Text>
       </Pressable>
       <Pressable style={styles.btnSecondary} onPress={async () => {
         if (!user?.id) return;

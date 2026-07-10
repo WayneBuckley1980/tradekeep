@@ -20,6 +20,7 @@ export default function NewJobScreen() {
       city: values.city.trim() || null,
       postcode: values.postcode.trim() || null,
       status: values.status,
+      pipeline_status: 'lead',
       price: values.price.trim() ? Number(values.price) : null,
       materials: values.materials.trim() || null,
       notes: values.notes.trim() || null,

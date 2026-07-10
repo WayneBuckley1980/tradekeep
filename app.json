@@ -42,7 +42,8 @@
           "photosPermission": "TradeKeepCRM needs photo library access for before/after job photos and client documents."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "expo-mail-composer"
     ],
     "experiments": {
       "typedRoutes": true
