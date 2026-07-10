@@ -19,6 +19,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { colors, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchCustomer } from '@/lib/customers';
+import { DocumentEmailCancelledError } from '@/lib/documents';
 import { fetchInvoiceForQuote } from '@/lib/invoices';
 import { pipelineErrorMessage } from '@/lib/jobPipeline';
 import { acceptQuoteAndActivateJob, sendQuoteByEmail } from '@/lib/jobWorkflow';
@@ -62,10 +63,19 @@ export default function QuoteDetailScreen() {
     if (!user?.id || !quote || !customer || !profile) return;
     setBusy(true);
     try {
-      await sendQuoteByEmail(user.id, profile, customer, quote);
-      Alert.alert('Quote sent', 'Your mail app opened with the quote PDF attached.');
+      const { emailed } = await sendQuoteByEmail(user.id, profile, customer, quote);
+      Alert.alert(
+        'Quote sent',
+        emailed
+          ? 'Your mail app opened with the quote PDF attached.'
+          : 'Quote marked as sent. Add a client email to send the PDF next time.',
+      );
       load();
     } catch (error) {
+      if (error instanceof DocumentEmailCancelledError) {
+        Alert.alert('Quote not sent', 'Email was cancelled. The quote is still saved as a draft.');
+        return;
+      }
       Alert.alert('Could not send quote', pipelineErrorMessage(error));
     } finally {
       setBusy(false);
@@ -114,9 +124,20 @@ export default function QuoteDetailScreen() {
         >
           <Text style={styles.btnSecondaryText}>Edit quote</Text>
         </Pressable>
-        <Pressable style={[styles.btnSecondary, busy && styles.btnDisabled]} disabled={busy} onPress={() => setAcceptModalVisible(true)}>
-          <Text style={styles.btnSecondaryText}>Client accepted → Activate job</Text>
-        </Pressable>
+        {quote.status !== 'accepted' && quote.status !== 'rejected' ? (
+          <Pressable
+            style={[styles.btnSecondary, busy && styles.btnDisabled]}
+            disabled={busy}
+            onPress={() => setAcceptModalVisible(true)}
+          >
+            <Text style={styles.btnSecondaryText}>Client accepted → Activate job</Text>
+          </Pressable>
+        ) : null}
+        {quote.status === 'accepted' && quote.job_id ? (
+          <Pressable style={styles.btn} onPress={() => router.push(`/job/${quote.job_id}`)}>
+            <Text style={styles.btnText}>View active job</Text>
+          </Pressable>
+        ) : null}
         <Pressable style={styles.btnSecondary} onPress={async () => {
           if (!user?.id) return;
           await updateQuote(user.id, quote.id, { status: 'rejected' });

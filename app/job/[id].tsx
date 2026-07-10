@@ -31,7 +31,8 @@ import {
 import { fetchCustomer } from '@/lib/customers';
 import { fetchInvoiceForJob } from '@/lib/invoices';
 import { PIPELINE_LABELS, pipelineErrorMessage } from '@/lib/jobPipeline';
-import { raiseInvoiceForJob, rescheduleJobStart, saveVisitPlan } from '@/lib/jobWorkflow';
+import { fetchQuotesForCustomer } from '@/lib/quotes';
+import { raiseInvoiceForJob, reconcileJobPipeline, rescheduleJobStart, saveVisitPlan } from '@/lib/jobWorkflow';
 import { deleteJob, duplicateJob, fetchJob, formatJobDateTime, updateJob } from '@/lib/jobs';
 import { formatMoney } from '@/lib/money';
 import { linkJobToProperty } from '@/lib/properties';
@@ -74,7 +75,11 @@ export default function JobDetailScreen() {
 
   const load = useCallback(async () => {
     if (!user?.id || !id) return;
-    const data = await fetchJob(user.id, id);
+    let data = await fetchJob(user.id, id);
+    if (data) {
+      const quotes = await fetchQuotesForCustomer(user.id, data.customer_id);
+      data = await reconcileJobPipeline(user.id, data, quotes);
+    }
     setJob(data);
     if (data) {
       syncFormFromJob(data);
@@ -244,7 +249,7 @@ export default function JobDetailScreen() {
         status: 'sent',
         due_at: null,
       });
-      Alert.alert('Invoice raised', 'Mail app opened with invoice PDF.');
+      Alert.alert('Invoice raised', 'Invoice saved. Open the invoice to email or record payment.');
       load();
       router.push(`/invoice/${invoice.id}`);
     } catch (error) {

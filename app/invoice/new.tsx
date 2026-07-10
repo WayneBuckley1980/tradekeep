@@ -11,6 +11,7 @@ import { fetchCustomer } from '@/lib/customers';
 import { fetchJob } from '@/lib/jobs';
 import { createInvoice, fetchInvoiceForJob, fetchInvoiceForQuote, generateReference } from '@/lib/invoices';
 import { fetchQuote } from '@/lib/quotes';
+import { completeJobAfterPayment, syncJobPipelineAfterInvoiceCreated } from '@/lib/jobWorkflow';
 import type { Customer, InvoiceStatus, Quote } from '@/types/database';
 
 const STATUSES: InvoiceStatus[] = ['draft', 'sent', 'paid', 'overdue'];
@@ -79,6 +80,7 @@ export default function NewInvoiceScreen() {
     if (quote) {
       setTitle(quote.title);
       setAmount(String(quote.amount));
+      if (quote.job_id) setLinkedJobId(quote.job_id);
     }
   };
 
@@ -104,6 +106,14 @@ export default function NewInvoiceScreen() {
         status,
         due_at: null,
       });
+
+      if (linkedJobId) {
+        await syncJobPipelineAfterInvoiceCreated(user.id, invoice);
+        if (status === 'paid') {
+          await completeJobAfterPayment(user.id, { ...invoice, status: 'paid' });
+        }
+      }
+
       router.replace(`/invoice/${invoice.id}`);
     } catch (error) {
       Alert.alert('Could not save', error instanceof Error ? error.message : 'Unknown error');

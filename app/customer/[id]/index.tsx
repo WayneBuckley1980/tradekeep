@@ -15,6 +15,7 @@ import { Card } from '@/components/Card';
 import { ContactActions } from '@/components/CustomerRow';
 import { EmptyState } from '@/components/EmptyState';
 import { JobProgressBar } from '@/components/JobProgressBar';
+import { LeadVisitModal } from '@/components/LeadVisitModal';
 import { StatusBadge } from '@/components/StatusBadge';
 import { SwipeToDelete } from '@/components/SwipeToDelete';
 import { UrgencyBanner } from '@/components/UrgencyBanner';
@@ -24,6 +25,7 @@ import { useTerminology } from '@/hooks/useTerminology';
 import { fetchCustomer } from '@/lib/customers';
 import { deleteInvoice, fetchInvoicesForCustomer } from '@/lib/invoices';
 import { fetchJobsForCustomer } from '@/lib/jobs';
+import { reconcileJobPipeline, downgradeJobWhenInvoiceRemoved } from '@/lib/jobWorkflow';
 import { formatMoney } from '@/lib/money';
 import { deleteQuote, fetchQuotesForCustomer } from '@/lib/quotes';
 import { getClientPipelineFocus } from '@/lib/jobPipeline';
@@ -49,6 +51,7 @@ export default function CustomerWorkspaceScreen() {
   const [stage, setStage] = useState<WorkflowStage>('quote');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [visitModalVisible, setVisitModalVisible] = useState(false);
 
   const stageLabels: Record<WorkflowStage, string> = {
     quote: terms.workflowQuote,
@@ -72,8 +75,14 @@ export default function CustomerWorkspaceScreen() {
       fetchJobsForCustomer(user.id, id),
       fetchInvoicesForCustomer(user.id, id),
     ]);
+    const reconciledJobs = await Promise.all(
+      j
+        .filter((job) => !job.deleted_at && job.pipeline_status !== 'complete')
+        .map((job) => reconcileJobPipeline(user.id, job, q)),
+    );
+    const jobById = new Map(reconciledJobs.map((job) => [job.id, job]));
     setQuotes(q);
-    setJobs(j);
+    setJobs(j.map((job) => jobById.get(job.id) ?? job));
     setInvoices(inv);
   }, [user?.id, id, navigation]);
 
@@ -94,7 +103,33 @@ export default function CustomerWorkspaceScreen() {
     () => getClientPipelineFocus(jobs, quotes),
     [jobs, quotes],
   );
+  const leadJob = useMemo(
+    () => jobs.find((j) => !j.deleted_at && j.pipeline_status === 'lead') ?? null,
+    [jobs],
+  );
   const items = workflow[stage];
+
+  const goToQuote = (jobId?: string) => {
+    if (!customer) return;
+    router.push({
+      pathname: '/quote/new',
+      params: jobId ? { customerId: customer.id, jobId } : { customerId: customer.id },
+    });
+  };
+
+  const handlePipelineTap = () => {
+    if (pipelineFocus.status === 'lead') {
+      if (leadJob?.visit_required === false || (leadJob?.visit_required === true && leadJob.visit_at)) {
+        goToQuote(leadJob?.id);
+        return;
+      }
+      setVisitModalVisible(true);
+      return;
+    }
+    if (pipelineFocus.route) {
+      router.push(pipelineFocus.route as never);
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -108,7 +143,13 @@ export default function CustomerWorkspaceScreen() {
   const handleDeleteItem = async (item: WorkflowItem) => {
     if (!user?.id) return;
     if (item.kind === 'quote') await deleteQuote(user.id, item.id);
-    if (item.kind === 'invoice') await deleteInvoice(user.id, item.id);
+    if (item.kind === 'invoice') {
+      const inv = invoices.find((i) => i.id === item.id);
+      await deleteInvoice(user.id, item.id);
+      if (inv?.job_id) {
+        await downgradeJobWhenInvoiceRemoved(user.id, inv.job_id);
+      }
+    }
     await load();
   };
 
@@ -181,25 +222,26 @@ export default function CustomerWorkspaceScreen() {
         <ContactActions customer={customer} />
       </View>
 
-      <Pressable
-        style={styles.pipelineWrap}
-        onPress={() => {
-          if (pipelineFocus.route) {
-            router.push(pipelineFocus.route as never);
-          } else {
-            router.push({ pathname: '/job/new', params: { customerId: customer.id } });
-          }
-        }}
-      >
+      <Pressable style={styles.pipelineWrap} onPress={handlePipelineTap}>
         <JobProgressBar currentStatus={pipelineFocus.status} />
         <Text style={styles.nextAction}>{pipelineFocus.nextAction}</Text>
         {pipelineFocus.title ? (
           <Text style={styles.pipelineJobTitle}>{pipelineFocus.title}</Text>
         ) : null}
-        <Text style={styles.pipelineTap}>
-          {pipelineFocus.route ? 'Tap to continue' : 'Tap to start a new job'}
-        </Text>
+        <Text style={styles.pipelineTap}>{pipelineFocus.pipelineTapHint}</Text>
       </Pressable>
+
+      {user?.id ? (
+        <LeadVisitModal
+          visible={visitModalVisible}
+          customer={customer}
+          userId={user.id}
+          leadJob={leadJob}
+          onClose={() => setVisitModalVisible(false)}
+          onContinueToQuote={goToQuote}
+          onSaved={load}
+        />
+      ) : null}
 
       <ScrollView
         horizontal
@@ -240,9 +282,17 @@ export default function CustomerWorkspaceScreen() {
           <View style={styles.footer}>
             <Pressable
               style={styles.primaryBtn}
-              onPress={() => router.push({ pathname: '/job/new', params: { customerId: customer.id } })}
+              onPress={() => {
+                if (pipelineFocus.status === 'lead') {
+                  handlePipelineTap();
+                } else {
+                  router.push({ pathname: '/job/new', params: { customerId: customer.id } });
+                }
+              }}
             >
-              <Text style={styles.primaryBtnText}>+ New {terms.job.toLowerCase()}</Text>
+              <Text style={styles.primaryBtnText}>
+                {pipelineFocus.status === 'lead' ? 'Confirm visit or quote' : `+ New ${terms.job.toLowerCase()}`}
+              </Text>
             </Pressable>
             <View style={styles.secondaryRow}>
               <Pressable
@@ -253,7 +303,15 @@ export default function CustomerWorkspaceScreen() {
               </Pressable>
               <Pressable
                 style={styles.secondaryBtn}
-                onPress={() => router.push({ pathname: '/invoice/new', params: { customerId: customer.id } })}
+                onPress={() => {
+                  const openJob = jobs.find((j) => !j.deleted_at && j.pipeline_status !== 'complete');
+                  router.push({
+                    pathname: '/invoice/new',
+                    params: openJob
+                      ? { customerId: customer.id, jobId: openJob.id }
+                      : { customerId: customer.id },
+                  });
+                }}
               >
                 <Text style={styles.secondaryBtnText}>+ Invoice</Text>
               </Pressable>

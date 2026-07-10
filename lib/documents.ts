@@ -22,6 +22,18 @@ export type DocumentDetails = {
   notes?: string | null;
 };
 
+export type DocumentEmailOptions = {
+  /** When true, skip email if client has no address instead of throwing. */
+  emailOptional?: boolean;
+};
+
+export class DocumentEmailCancelledError extends Error {
+  constructor() {
+    super('Email was cancelled. Nothing was marked as sent.');
+    this.name = 'DocumentEmailCancelledError';
+  }
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -127,22 +139,29 @@ export async function emailDocumentPdf(
   reference: string,
   pdfUri: string,
   clientName: string,
+  options?: DocumentEmailOptions,
 ): Promise<boolean> {
   if (!clientEmail?.trim()) {
+    if (options?.emailOptional) return false;
     throw new Error('This client has no email address. Add an email on the client record first.');
   }
 
   const available = await MailComposer.isAvailableAsync();
   if (!available) {
+    if (options?.emailOptional) return false;
     throw new Error('Email is not available on this device.');
   }
 
-  await MailComposer.composeAsync({
+  const result = await MailComposer.composeAsync({
     recipients: [clientEmail.trim()],
     subject: subjectFor(profile, docType, reference),
     body: bodyFor(docType, clientName),
     attachments: [pdfUri],
   });
+
+  if (result.status === MailComposer.MailComposerStatus.CANCELLED) {
+    throw new DocumentEmailCancelledError();
+  }
 
   return true;
 }
@@ -151,8 +170,17 @@ export async function generateAndEmailDocument(
   profile: Profile,
   client: Customer,
   doc: DocumentDetails,
-): Promise<string> {
+  options?: DocumentEmailOptions,
+): Promise<{ pdfUri: string; emailed: boolean }> {
   const pdfUri = await generateDocumentPdf(profile, client, doc);
-  await emailDocumentPdf(client.email, profile, doc.type, doc.reference, pdfUri, client.name);
-  return pdfUri;
+  const emailed = await emailDocumentPdf(
+    client.email,
+    profile,
+    doc.type,
+    doc.reference,
+    pdfUri,
+    client.name,
+    options,
+  );
+  return { pdfUri, emailed };
 }

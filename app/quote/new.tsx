@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTerminology } from '@/hooks/useTerminology';
 import { fetchCustomer } from '@/lib/customers';
 import { fetchJob, updateJob } from '@/lib/jobs';
+import { syncJobPipelineAfterQuoteLinked } from '@/lib/jobWorkflow';
 import {
   fetchQuoteLineItems,
   lineItemDraftFromDb,
@@ -155,6 +156,7 @@ export default function NewQuoteScreen() {
 
     if (jobId) {
       await updateJob(user.id, jobId, { quote_id: quote.id });
+      await syncJobPipelineAfterQuoteLinked(user.id, jobId);
     }
 
     router.replace(`/quote/${quote.id}`);

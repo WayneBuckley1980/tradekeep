@@ -17,6 +17,7 @@ import { colors, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchCustomers } from '@/lib/customers';
 import { fetchJobs, filterJobsByTab } from '@/lib/jobs';
+import { reconcileJobPipelineFromInvoices } from '@/lib/jobWorkflow';
 import type { Customer, Job } from '@/types/database';
 
 const TABS = ['today', 'upcoming', 'in_progress', 'completed', 'cancelled'] as const;
@@ -42,7 +43,12 @@ export default function JobsScreen() {
   const load = useCallback(async () => {
     if (!user?.id) return;
     const [j, c] = await Promise.all([fetchJobs(user.id), fetchCustomers(user.id)]);
-    setJobs(j);
+    const reconciled = await Promise.all(
+      j.map(async (job) =>
+        job.pipeline_status === 'complete' ? job : reconcileJobPipelineFromInvoices(user.id, job),
+      ),
+    );
+    setJobs(reconciled);
     setCustomers(c);
   }, [user?.id]);
 

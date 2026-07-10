@@ -68,6 +68,18 @@ export async function fetchJob(userId: string, jobId: string): Promise<Job | nul
   return data;
 }
 
+export async function fetchJobForQuote(userId: string, quoteId: string): Promise<Job | null> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('quote_id', quoteId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function createJob(userId: string, payload: JobInsert): Promise<Job> {
   const { data, error } = await supabase
     .from('jobs')
@@ -169,13 +181,16 @@ export function filterJobsByTab(jobs: Job[], tab: 'upcoming' | 'today' | 'in_pro
           isJobToday(j.start_at ?? j.scheduled_at),
       );
     case 'upcoming':
-      return jobs.filter(
-        (j) =>
+      return jobs.filter((j) => {
+        if (j.status === 'cancelled' || j.pipeline_status === 'complete') return false;
+        if (j.pipeline_status === 'lead' || j.pipeline_status === 'quoted') return true;
+        return (
           j.pipeline_status === 'active' &&
           j.status === 'upcoming' &&
           !isJobToday(j.start_at ?? j.scheduled_at) &&
-          new Date(j.start_at ?? j.scheduled_at) >= now,
-      );
+          new Date(j.start_at ?? j.scheduled_at) >= now
+        );
+      });
     case 'in_progress':
       return jobs.filter((j) => j.status === 'in_progress' || j.pipeline_status === 'invoiced');
     case 'completed':

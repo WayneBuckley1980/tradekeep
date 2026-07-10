@@ -8,7 +8,10 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { pipelineErrorMessage } from '@/lib/jobPipeline';
-import { logPaymentWithReceipt } from '@/lib/jobWorkflow';
+import {
+  completeJobAfterPayment,
+  logPaymentWithReceipt,
+} from '@/lib/jobWorkflow';
 import { fetchCustomer } from '@/lib/customers';
 import { duplicateInvoice, effectiveInvoiceStatus, fetchInvoice } from '@/lib/invoices';
 import { formatMoney } from '@/lib/money';

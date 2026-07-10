@@ -67,7 +67,40 @@ export type ClientPipelineFocus = {
   title: string | null;
   route: string | null;
   nextAction: string;
+  pipelineTapHint: string;
+  leadJobId: string | null;
 };
+
+function leadNextAction(job: Job | null): { nextAction: string; pipelineTapHint: string } {
+  if (!job) {
+    return {
+      nextAction: 'Confirm visit or create a quote',
+      pipelineTapHint: 'Tap to confirm visit or create quote',
+    };
+  }
+  if (job.visit_required === null) {
+    return {
+      nextAction: 'Confirm visit or create a quote',
+      pipelineTapHint: 'Tap to confirm visit or create quote',
+    };
+  }
+  if (job.visit_required === false) {
+    return {
+      nextAction: 'Create a quote',
+      pipelineTapHint: 'Tap to create a quote',
+    };
+  }
+  if (job.visit_at) {
+    return {
+      nextAction: 'Create a quote',
+      pipelineTapHint: 'Tap to create a quote',
+    };
+  }
+  return {
+    nextAction: 'Set visit date',
+    pipelineTapHint: 'Tap to set visit date',
+  };
+}
 
 export function pipelineNextActionHint(status: JobPipelineStatus): string {
   switch (status) {
@@ -95,11 +128,33 @@ export function getClientPipelineFocus(jobs: Job[], quotes: Quote[]): ClientPipe
 
   if (openJobs.length > 0) {
     const job = openJobs[0];
+    const linkedQuote =
+      (job.quote_id ? quotes.find((q) => q.id === job.quote_id) : null) ??
+      quotes.find((q) => q.job_id === job.id && q.status !== 'rejected' && q.status !== 'expired');
+
+    let status: JobPipelineStatus = job.pipeline_status;
+    let route: string | null = job.pipeline_status === 'lead' ? null : `/job/${job.id}`;
+
+    if (linkedQuote) {
+      if (linkedQuote.status === 'accepted') {
+        status = pipelineStatusIndex(job.pipeline_status) >= pipelineStatusIndex('active') ? job.pipeline_status : 'active';
+        route = `/job/${job.id}`;
+      } else if (linkedQuote.status === 'sent' || linkedQuote.status === 'draft') {
+        if (pipelineStatusIndex(status) < pipelineStatusIndex('quoted')) {
+          status = 'quoted';
+        }
+        route = `/quote/${linkedQuote.id}`;
+      }
+    }
+
+    const leadHints = status === 'lead' ? leadNextAction(job) : null;
     return {
-      status: job.pipeline_status,
-      title: job.title,
-      route: `/job/${job.id}`,
-      nextAction: pipelineNextActionHint(job.pipeline_status),
+      status,
+      title: linkedQuote?.title ?? job.title,
+      route: status === 'lead' ? null : route,
+      nextAction: leadHints?.nextAction ?? pipelineNextActionHint(status),
+      pipelineTapHint: leadHints?.pipelineTapHint ?? 'Tap to continue',
+      leadJobId: status === 'lead' ? job.id : null,
     };
   }
 
@@ -114,13 +169,18 @@ export function getClientPipelineFocus(jobs: Job[], quotes: Quote[]): ClientPipe
       title: openQuote.title,
       route: `/quote/${openQuote.id}`,
       nextAction: pipelineNextActionHint(status),
+      pipelineTapHint: 'Tap to continue',
+      leadJobId: null,
     };
   }
 
+  const leadHints = leadNextAction(null);
   return {
     status: 'lead',
     title: null,
     route: null,
-    nextAction: pipelineNextActionHint('lead'),
+    nextAction: leadHints.nextAction,
+    pipelineTapHint: leadHints.pipelineTapHint,
+    leadJobId: null,
   };
 }
