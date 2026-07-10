@@ -178,22 +178,22 @@ export function getTerminology(businessType: BusinessType | null | undefined): T
   return { ...BASE, ...overrides };
 }
 
-export const BUSINESS_TYPES: { id: BusinessType; label: string; icon: string }[] = [
-  { id: 'trades', label: 'Trades & Contractors', icon: '🔧' },
-  { id: 'hair', label: 'Hairdresser / Barber', icon: '💇' },
-  { id: 'beauty', label: 'Hair & Beauty', icon: '💄' },
-  { id: 'pt', label: 'Personal Trainer', icon: '🏋️' },
-  { id: 'photographer', label: 'Photographer', icon: '📸' },
-  { id: 'dog_groomer', label: 'Dog Groomer', icon: '🐶' },
-  { id: 'dog_walker', label: 'Dog Walker', icon: '🦮' },
-  { id: 'dog_trainer', label: 'Dog Trainer', icon: '🎾' },
-  { id: 'cleaning', label: 'Cleaning Business', icon: '🧹' },
-  { id: 'gardening', label: 'Gardening & Landscaping', icon: '🌿' },
-  { id: 'tutor', label: 'Tutor / Coach', icon: '🎓' },
-  { id: 'mechanic', label: 'Mobile Mechanic', icon: '🚗' },
-  { id: 'freelance', label: 'Freelance Services', icon: '📱' },
-  { id: 'property', label: 'Property Services', icon: '🏠' },
-  { id: 'other', label: 'Other', icon: '📦' },
+export const BUSINESS_TYPES: { id: BusinessType; label: string }[] = [
+  { id: 'trades', label: 'Trades & Contractors' },
+  { id: 'hair', label: 'Hairdresser / Barber' },
+  { id: 'beauty', label: 'Hair & Beauty' },
+  { id: 'pt', label: 'Personal Trainer' },
+  { id: 'photographer', label: 'Photographer' },
+  { id: 'dog_groomer', label: 'Dog Groomer' },
+  { id: 'dog_walker', label: 'Dog Walker' },
+  { id: 'dog_trainer', label: 'Dog Trainer' },
+  { id: 'cleaning', label: 'Cleaning Business' },
+  { id: 'gardening', label: 'Gardening & Landscaping' },
+  { id: 'tutor', label: 'Tutor / Coach' },
+  { id: 'mechanic', label: 'Mobile Mechanic' },
+  { id: 'freelance', label: 'Freelance Services' },
+  { id: 'property', label: 'Property Services' },
+  { id: 'other', label: 'Other' },
 ];
 
 export const WORK_LOCATIONS: { id: WorkLocationType; label: string }[] = [

@@ -50,6 +50,7 @@ export default function RootLayout() {
         <Stack.Screen name="lead/new" options={{ title: 'New lead', presentation: 'modal' }} />
         <Stack.Screen name="lead/[id]" options={{ title: 'Lead' }} />
         <Stack.Screen name="export" options={{ title: 'Export data' }} />
+        <Stack.Screen name="archived-jobs" options={{ title: 'Archived jobs' }} />
         <Stack.Screen name="paywall" options={{ title: 'Upgrade', presentation: 'modal' }} />
       </Stack>
     </AuthProvider>

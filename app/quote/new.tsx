@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 
 import { CustomerPicker } from '@/components/CustomerPicker';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
@@ -9,15 +9,21 @@ import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchCustomer } from '@/lib/customers';
 import { fetchJob, updateJob } from '@/lib/jobs';
-import { saveQuoteLineItems } from '@/lib/quoteItems';
-import { createQuote, generateReference } from '@/lib/quotes';
+import { fetchQuoteLineItems, saveQuoteLineItems } from '@/lib/quoteItems';
+import { createQuote, fetchQuote, generateReference, updateQuote } from '@/lib/quotes';
 import type { Customer, QuoteStatus } from '@/types/database';
 
 const STATUSES: QuoteStatus[] = ['draft', 'sent', 'accepted', 'rejected'];
 
 export default function NewQuoteScreen() {
-  const { customerId: paramCustomerId, jobId } = useLocalSearchParams<{ customerId?: string; jobId?: string }>();
+  const { customerId: paramCustomerId, jobId, quoteId } = useLocalSearchParams<{
+    customerId?: string;
+    jobId?: string;
+    quoteId?: string;
+  }>();
+  const navigation = useNavigation();
   const { user } = useAuth();
+  const isEditMode = Boolean(quoteId);
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [title, setTitle] = useState('');
@@ -25,12 +31,41 @@ export default function NewQuoteScreen() {
   const [status, setStatus] = useState<QuoteStatus>('sent');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [fromJob, setFromJob] = useState(false);
+  const [loading, setLoading] = useState(Boolean(quoteId));
   const { items, setItems, discount, setDiscount } = useQuoteLineItemsState();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: isEditMode ? 'Edit quote' : 'New quote' });
+  }, [navigation, isEditMode]);
 
   useEffect(() => {
     if (!user?.id) return;
 
     const prefill = async () => {
+      if (quoteId) {
+        const quote = await fetchQuote(user.id, quoteId);
+        if (!quote) return;
+        setCustomerId(quote.customer_id);
+        const customer = await fetchCustomer(user.id, quote.customer_id);
+        setCustomerName(customer?.name ?? '');
+        setTitle(quote.title);
+        setDescription(quote.description ?? '');
+        setStatus(quote.status);
+        if (quote.job_id) setFromJob(true);
+
+        const lineItems = await fetchQuoteLineItems(user.id, quoteId);
+        const discountItem = lineItems.find((i) => i.label === 'Discount');
+        const regularItems = lineItems.filter((i) => i.label !== 'Discount');
+        if (discountItem) {
+          setDiscount(String(Math.abs(Number(discountItem.amount))));
+        }
+        if (regularItems.length > 0) {
+          setItems(regularItems.map((i) => ({ label: i.label, amount: String(i.amount) })));
+        }
+        setLoading(false);
+        return;
+      }
+
       if (jobId) {
         const job = await fetchJob(user.id, jobId);
         if (!job) return;
@@ -54,7 +89,7 @@ export default function NewQuoteScreen() {
     };
 
     prefill().catch(console.error);
-  }, [user?.id, jobId, paramCustomerId, setItems]);
+  }, [user?.id, jobId, paramCustomerId, quoteId, setItems, setDiscount]);
 
   const save = async () => {
     if (!user?.id || !customerId || !title.trim()) {
@@ -68,6 +103,23 @@ export default function NewQuoteScreen() {
 
     const subtotal = lineItems.reduce((sum, i) => sum + i.amount, 0);
     const total = Math.max(0, subtotal - (Number(discount) || 0));
+
+    if (quoteId) {
+      await updateQuote(user.id, quoteId, {
+        title: title.trim(),
+        description: description.trim() || null,
+        amount: total,
+        status,
+      });
+
+      const rows = [...lineItems];
+      if (Number(discount) > 0) {
+        rows.push({ label: 'Discount', amount: -Number(discount) });
+      }
+      await saveQuoteLineItems(user.id, quoteId, rows);
+      router.replace(`/quote/${quoteId}`);
+      return;
+    }
 
     const quote = await createQuote(user.id, {
       customer_id: customerId,
@@ -96,11 +148,12 @@ export default function NewQuoteScreen() {
   };
 
   if (!user?.id) return null;
+  if (loading) return null;
 
   return (
     <>
       <KeyboardSafeScroll contentContainerStyle={styles.container} keyboardVerticalOffset={Platform.OS === 'ios' ? 110 : 0}>
-        <Pressable style={styles.input} onPress={() => !fromJob && setPickerOpen(true)} disabled={fromJob}>
+        <Pressable style={styles.input} onPress={() => !fromJob && !isEditMode && setPickerOpen(true)} disabled={fromJob || isEditMode}>
           <Text style={customerId ? styles.text : styles.placeholder}>{customerName || 'Select client *'}</Text>
         </Pressable>
         <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Quote title *" placeholderTextColor={colors.textMuted} />
@@ -113,7 +166,7 @@ export default function NewQuoteScreen() {
             </Pressable>
           ))}
         </View>
-        <Pressable style={styles.btn} onPress={save}><Text style={styles.btnText}>Save quote</Text></Pressable>
+        <Pressable style={styles.btn} onPress={save}><Text style={styles.btnText}>{isEditMode ? 'Update quote' : 'Save quote'}</Text></Pressable>
       </KeyboardSafeScroll>
       <CustomerPicker userId={user.id} visible={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={(c: Customer) => { setCustomerId(c.id); setCustomerName(c.name); }} />
     </>

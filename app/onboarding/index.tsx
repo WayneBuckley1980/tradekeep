@@ -58,7 +58,6 @@ export default function OnboardingScreen() {
           {BUSINESS_TYPES.map((item) => (
             <Pressable key={item.id} onPress={() => setBusinessType(item.id)}>
               <Card style={StyleSheet.flatten([styles.card, businessType === item.id && styles.cardSelected])}>
-                <Text style={styles.cardIcon}>{item.icon}</Text>
                 <Text style={styles.cardLabel}>{item.label}</Text>
               </Card>
             </Pressable>

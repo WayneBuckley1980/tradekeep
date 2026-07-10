@@ -1,20 +1,18 @@
 import { useCallback, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Card } from '@/components/Card';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 import { colors, FREE_TIER_LIMIT, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTerminology } from '@/hooks/useTerminology';
 import { updateProfile } from '@/lib/customers';
 import { restorePurchases } from '@/lib/purchases';
 import { createTag, deleteTag, ensureDefaultTags, fetchTags } from '@/lib/tags';
-import { BUSINESS_TYPES, WORK_LOCATIONS } from '@/lib/terminology';
-import type { BusinessType, Tag, WorkLocationType } from '@/types/database';
+import { WORK_LOCATIONS } from '@/lib/terminology';
+import type { Tag, WorkLocationType } from '@/types/database';
 
 export default function MoreScreen() {
   const { user, isPro, profile, signOut, refreshProfile } = useAuth();
-  const terms = useTerminology();
   const [tags, setTags] = useState<Tag[]>([]);
   const [businessName, setBusinessName] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
@@ -23,7 +21,6 @@ export default function MoreScreen() {
   const [businessAddress2, setBusinessAddress2] = useState('');
   const [businessCity, setBusinessCity] = useState('');
   const [businessPostcode, setBusinessPostcode] = useState('');
-  const [businessType, setBusinessType] = useState<BusinessType | null>(null);
   const [workLocation, setWorkLocation] = useState<WorkLocationType>('visit_customers');
   const [newTag, setNewTag] = useState('');
 
@@ -41,16 +38,12 @@ export default function MoreScreen() {
       setBusinessAddress2(profile?.business_address_line2 ?? '');
       setBusinessCity(profile?.business_city ?? '');
       setBusinessPostcode(profile?.business_postcode ?? '');
-      setBusinessType(profile?.business_type ?? null);
       setWorkLocation(profile?.work_location ?? 'visit_customers');
     }, [user?.id, profile]),
   );
 
   const saveBusiness = async () => {
-    if (!user?.id || !businessType) {
-      Alert.alert('Business type required', 'Select a business type before saving.');
-      return;
-    }
+    if (!user?.id) return;
     await updateProfile(user.id, {
       business_name: businessName.trim() || null,
       business_phone: businessPhone.trim() || null,
@@ -59,7 +52,6 @@ export default function MoreScreen() {
       business_address_line2: businessAddress2.trim() || null,
       business_city: businessCity.trim() || null,
       business_postcode: businessPostcode.trim() || null,
-      business_type: businessType,
       work_location: workLocation,
     });
     await refreshProfile();
@@ -95,23 +87,6 @@ export default function MoreScreen() {
 
   return (
     <KeyboardSafeScroll contentContainerStyle={styles.content} bottomInset={160} wrapStyle={styles.container}>
-      <Text style={styles.sectionTitle}>Business type</Text>
-      <Card style={styles.card}>
-        <Text style={styles.hint}>Changes labels across the app ({terms.job}, {terms.client}, etc.)</Text>
-        {BUSINESS_TYPES.map((item) => (
-          <Pressable key={item.id} style={styles.typeRow} onPress={() => setBusinessType(item.id)}>
-            <Text style={styles.typeIcon}>{item.icon}</Text>
-            <Text style={[styles.typeLabel, businessType === item.id && styles.typeSelected]}>{item.label}</Text>
-          </Pressable>
-        ))}
-        <Text style={[styles.label, styles.spaced]}>Work style</Text>
-        {WORK_LOCATIONS.map((item) => (
-          <Pressable key={item.id} style={styles.typeRow} onPress={() => setWorkLocation(item.id)}>
-            <Text style={[styles.typeLabel, workLocation === item.id && styles.typeSelected]}>{item.label}</Text>
-          </Pressable>
-        ))}
-      </Card>
-
       <Text style={styles.sectionTitle}>Business profile</Text>
       <Card style={styles.card}>
         <TextInput style={styles.input} value={businessName} onChangeText={setBusinessName} placeholder="Business name" placeholderTextColor={colors.textMuted} />
@@ -121,6 +96,12 @@ export default function MoreScreen() {
         <TextInput style={styles.input} value={businessAddress2} onChangeText={setBusinessAddress2} placeholder="Address line 2" placeholderTextColor={colors.textMuted} />
         <TextInput style={styles.input} value={businessCity} onChangeText={setBusinessCity} placeholder="City" placeholderTextColor={colors.textMuted} />
         <TextInput style={styles.input} value={businessPostcode} onChangeText={setBusinessPostcode} placeholder="Postcode" placeholderTextColor={colors.textMuted} autoCapitalize="characters" />
+        <Text style={[styles.label, styles.spaced]}>Work style</Text>
+        {WORK_LOCATIONS.map((item) => (
+          <Pressable key={item.id} style={styles.typeRow} onPress={() => setWorkLocation(item.id)}>
+            <Text style={[styles.typeLabel, workLocation === item.id && styles.typeSelected]}>{item.label}</Text>
+          </Pressable>
+        ))}
         <Pressable style={styles.btn} onPress={saveBusiness}>
           <Text style={styles.btnText}>Save profile</Text>
         </Pressable>
@@ -161,6 +142,9 @@ export default function MoreScreen() {
       <Pressable style={styles.row} onPress={() => router.push('/export' as never)}>
         <Text style={styles.rowText}>Export CSV</Text>
       </Pressable>
+      <Pressable style={styles.row} onPress={() => router.push('/archived-jobs' as never)}>
+        <Text style={styles.rowText}>Archived jobs</Text>
+      </Pressable>
       <Pressable style={styles.row} onPress={handleRestore}><Text style={styles.rowText}>Restore purchases</Text></Pressable>
       <Pressable style={styles.row} onPress={handleSignOut}><Text style={[styles.rowText, styles.destructive]}>Sign out</Text></Pressable>
 
@@ -175,16 +159,14 @@ const styles = StyleSheet.create({
   sectionTitle: { ...typography.label, color: colors.textSecondary, marginBottom: spacing.sm, marginTop: spacing.md, textTransform: 'uppercase' },
   card: { marginBottom: spacing.md },
   input: { ...inputStyle, marginBottom: spacing.sm },
-  btn: { backgroundColor: colors.ctaBackground, borderRadius: 10, padding: spacing.md, alignItems: 'center' },
+  btn: { backgroundColor: colors.ctaBackground, borderRadius: 10, padding: spacing.md, alignItems: 'center', marginTop: spacing.sm },
   smallBtn: { backgroundColor: colors.ctaBackground, borderRadius: 10, padding: spacing.md, marginLeft: spacing.sm },
   btnText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
   tagRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
   tagName: { ...typography.body, fontWeight: '600' },
   deleteTag: { ...typography.caption, color: colors.statusOverdue },
   tagAdd: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
-  hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
   typeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs, gap: spacing.sm },
-  typeIcon: { fontSize: 20 },
   typeLabel: { ...typography.body, color: colors.textSecondary, flex: 1 },
   typeSelected: { color: colors.textPrimary, fontWeight: '700' },
   label: { ...typography.caption, color: colors.textSecondary },

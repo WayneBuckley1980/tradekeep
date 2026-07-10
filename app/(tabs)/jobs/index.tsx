@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { EmptyState } from '@/components/EmptyState';
 import { JobRow } from '@/components/JobRow';
@@ -32,6 +32,7 @@ const TAB_LABELS: Record<JobTab, string> = {
 
 export default function JobsScreen() {
   const { user } = useAuth();
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [tab, setTab] = useState<JobTab>('today');
@@ -47,11 +48,14 @@ export default function JobsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (tabParam && TABS.includes(tabParam as JobTab)) {
+        setTab(tabParam as JobTab);
+      }
       setLoading(true);
       load()
         .catch(console.error)
         .finally(() => setLoading(false));
-    }, [load]),
+    }, [load, tabParam]),
   );
 
   const customerMap = new Map(customers.map((c) => [c.id, c.name]));

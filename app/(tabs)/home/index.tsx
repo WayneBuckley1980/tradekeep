@@ -35,7 +35,7 @@ export default function HomeScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [query, setQuery] = useState('');
-  const [tab, setTab] = useState<'clients' | 'leads'>('clients');
+  const [tab, setTab] = useState<'clients' | 'leads'>('leads');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [savingType, setSavingType] = useState(false);
@@ -123,18 +123,17 @@ export default function HomeScreen() {
       <View style={styles.typeBar}>
         <Text style={styles.typeLabel}>Business type</Text>
         <BusinessTypePicker
-          compact
           value={profile?.business_type ?? null}
           onChange={handleSelectBusinessType}
         />
       </View>
 
       <View style={styles.tabRow}>
-        <Pressable style={[styles.tab, tab === 'clients' && styles.tabActive]} onPress={() => setTab('clients')}>
-          <Text style={styles.tabText}>{terms.clients}</Text>
-        </Pressable>
         <Pressable style={[styles.tab, tab === 'leads' && styles.tabActive]} onPress={() => setTab('leads')}>
           <Text style={styles.tabText}>Leads ({leads.length})</Text>
+        </Pressable>
+        <Pressable style={[styles.tab, tab === 'clients' && styles.tabActive]} onPress={() => setTab('clients')}>
+          <Text style={styles.tabText}>{terms.clients}</Text>
         </Pressable>
       </View>
 

@@ -16,7 +16,8 @@
         "UIBackgroundModes": [
           "remote-notification"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCalendarsUsageDescription": "TradeKeepCRM adds site visits and job start dates to your calendar when you choose to."
       }
     },
     "plugins": [
@@ -43,7 +44,8 @@
         }
       ],
       "expo-audio",
-      "expo-mail-composer"
+      "expo-mail-composer",
+      "expo-calendar"
     ],
     "experiments": {
       "typedRoutes": true

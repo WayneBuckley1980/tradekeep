@@ -23,7 +23,7 @@ import { useTerminology } from '@/hooks/useTerminology';
 import { COMM_TYPES, fetchCommunicationLogs, logCommunication } from '@/lib/communication';
 import { deleteCustomer, fetchCustomer, updateCustomer } from '@/lib/customers';
 import { getCustomerHealth, healthLabel, ratingStars } from '@/lib/customerHealth';
-import { formatDisplayDate, formatRelativeDate } from '@/lib/dates';
+import { formatRelativeDate } from '@/lib/dates';
 import { fetchInvoicesForCustomer } from '@/lib/invoices';
 import { fetchJobsForCustomer } from '@/lib/jobs';
 import { formatMoney } from '@/lib/money';
@@ -163,7 +163,7 @@ export default function CustomerDetailsScreen() {
       <UrgencyBanner followUpAt={customer.follow_up_at} customerName={customer.name} />
 
       <Text style={styles.name}>
-        {customer.is_favourite ? `⭐ ${customer.name}` : customer.name}
+        {customer.is_favourite ? `${customer.name} (Favourite)` : customer.name}
         {customer.rating ? ` ${ratingStars(customer.rating)}` : ''}
       </Text>
       <ContactActions customer={customer} />
@@ -188,16 +188,6 @@ export default function CustomerDetailsScreen() {
             >
               <Text style={styles.followUpText}>Suggest follow up</Text>
             </Pressable>
-          ) : null}
-        </Card>
-      ) : null}
-
-      {customer.next_action ? (
-        <Card style={styles.card}>
-          <Text style={styles.label}>Next action</Text>
-          <Text style={styles.value}>{customer.next_action}</Text>
-          {customer.next_action_due_at ? (
-            <Text style={styles.meta}>Due {formatDisplayDate(customer.next_action_due_at)}</Text>
           ) : null}
         </Card>
       ) : null}
@@ -293,7 +283,7 @@ export default function CustomerDetailsScreen() {
           <Text style={styles.btnText}>Edit</Text>
         </Pressable>
         <Pressable style={styles.btnSecondary} onPress={() => router.back()}>
-          <Text style={styles.btnSecondaryText}>← Workspace</Text>
+          <Text style={styles.btnSecondaryText}>Back</Text>
         </Pressable>
       </View>
 
@@ -336,7 +326,7 @@ const styles = StyleSheet.create({
   btn: { flex: 1, backgroundColor: colors.ctaBackground, borderRadius: 12, paddingVertical: spacing.md, alignItems: 'center' },
   btnText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
   btnSecondary: { flex: 1, borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 12, paddingVertical: spacing.md, alignItems: 'center' },
-  btnSecondaryText: { ...typography.label, color: colors.textPrimary, fontWeight: '600', fontSize: 12 },
+  btnSecondaryText: { ...typography.label, color: colors.textPrimary, fontWeight: '600' },
   archive: { ...typography.body, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm },
   delete: { ...typography.body, color: colors.statusOverdue, textAlign: 'center' },
 });

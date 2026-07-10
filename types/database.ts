@@ -37,7 +37,12 @@ export type NotificationIds = {
 };
 
 export type JobStatus = 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
-export type JobPipelineStatus = 'lead' | 'quoted' | 'active' | 'complete' | 'closed';
+export type JobPipelineStatus = 'lead' | 'quoted' | 'active' | 'invoiced' | 'complete' | 'closed';
+
+export type JobNotificationIds = {
+  week_before?: string;
+  day_before?: string;
+};
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
 export type AttachmentKind =
@@ -169,6 +174,14 @@ export type Job = {
   price: number | null;
   materials: string | null;
   notes: string | null;
+  visit_required: boolean | null;
+  visit_at: string | null;
+  start_at: string | null;
+  work_completed_notes: string | null;
+  additional_works: string | null;
+  additional_materials: string | null;
+  deleted_at: string | null;
+  job_notification_ids: JobNotificationIds | null;
   quote_id: string | null;
   property_id: string | null;
   created_at: string;

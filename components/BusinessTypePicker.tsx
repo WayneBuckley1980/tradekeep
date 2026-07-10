@@ -1,6 +1,6 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Card } from '@/components/Card';
 import { colors, spacing, typography } from '@/constants/theme';
 import { BUSINESS_TYPES } from '@/lib/terminology';
 import type { BusinessType } from '@/types/database';
@@ -8,30 +8,41 @@ import type { BusinessType } from '@/types/database';
 type BusinessTypePickerProps = {
   value: BusinessType | null;
   onChange: (type: BusinessType) => void;
-  compact?: boolean;
 };
 
-export function BusinessTypePicker({ value, onChange, compact }: BusinessTypePickerProps) {
+export function BusinessTypePicker({ value, onChange }: BusinessTypePickerProps) {
+  const [open, setOpen] = useState(false);
+  const selected = BUSINESS_TYPES.find((t) => t.id === value);
+
   return (
-    <ScrollView
-      horizontal={compact}
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={compact ? styles.compactRow : undefined}
-    >
-      {BUSINESS_TYPES.map((item) => (
-        <Pressable key={item.id} onPress={() => onChange(item.id)}>
-          <Card
-            style={StyleSheet.flatten([
-              compact ? styles.compactCard : styles.card,
-              value === item.id && styles.selected,
-            ])}
-          >
-            <Text style={styles.icon}>{item.icon}</Text>
-            <Text style={[styles.label, value === item.id && styles.labelSelected]}>{item.label}</Text>
-          </Card>
+    <>
+      <Pressable style={styles.trigger} onPress={() => setOpen(true)}>
+        <Text style={styles.triggerText}>{selected?.label ?? 'Select business type'}</Text>
+        <Text style={styles.chevron}>▼</Text>
+      </Pressable>
+
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>Business type</Text>
+            <ScrollView>
+              {BUSINESS_TYPES.map((item) => (
+                <Pressable
+                  key={item.id}
+                  style={[styles.row, value === item.id && styles.rowSelected]}
+                  onPress={() => {
+                    onChange(item.id);
+                    setOpen(false);
+                  }}
+                >
+                  <Text style={[styles.rowLabel, value === item.id && styles.rowLabelSelected]}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
         </Pressable>
-      ))}
-    </ScrollView>
+      </Modal>
+    </>
   );
 }
 
@@ -44,7 +55,7 @@ export function BusinessTypeGate({ onSelect, saving }: BusinessTypeGateProps) {
   return (
     <View style={styles.gate}>
       <Text style={styles.gateTitle}>What type of business are you?</Text>
-      <Text style={styles.gateHint}>Pick one to unlock your client list. You can change this later in Settings.</Text>
+      <Text style={styles.gateHint}>Pick one to unlock your client list. You can change this later on Home.</Text>
       <BusinessTypePicker value={null} onChange={onSelect} />
       {saving ? <Text style={styles.saving}>Saving…</Text> : null}
     </View>
@@ -52,20 +63,33 @@ export function BusinessTypeGate({ onSelect, saving }: BusinessTypeGateProps) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  compactCard: {
-    marginRight: spacing.sm,
+  trigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    justifyContent: 'space-between',
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
   },
-  compactRow: { paddingVertical: spacing.xs },
-  selected: { borderColor: colors.textPrimary, borderWidth: 2 },
-  icon: { fontSize: 22 },
-  label: { ...typography.body, color: colors.textSecondary, fontWeight: '600', flex: 1 },
-  labelSelected: { color: colors.textPrimary },
+  triggerText: { ...typography.body, color: colors.textPrimary, flex: 1, fontWeight: '600' },
+  chevron: { ...typography.caption, color: colors.textMuted },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '70%',
+    padding: spacing.md,
+  },
+  sheetTitle: { ...typography.heading, color: colors.textPrimary, marginBottom: spacing.md },
+  row: { paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
+  rowSelected: { backgroundColor: colors.surfaceElevated },
+  rowLabel: { ...typography.body, color: colors.textSecondary },
+  rowLabelSelected: { color: colors.textPrimary, fontWeight: '700' },
   gate: { flex: 1, padding: spacing.lg, justifyContent: 'center' },
   gateTitle: { ...typography.title, color: colors.textPrimary, marginBottom: spacing.sm },
   gateHint: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.lg },

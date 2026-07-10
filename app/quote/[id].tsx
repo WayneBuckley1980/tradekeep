@@ -1,5 +1,17 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { Card } from '@/components/Card';
@@ -22,6 +34,10 @@ export default function QuoteDetailScreen() {
   const [invoicedRef, setInvoicedRef] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [acceptModalVisible, setAcceptModalVisible] = useState(false);
+  const [startAt, setStartAt] = useState(new Date());
+  const [addToCalendar, setAddToCalendar] = useState(false);
+  const [showStartPicker, setShowStartPicker] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.id || !id) return;
@@ -60,7 +76,12 @@ export default function QuoteDetailScreen() {
     if (!user?.id || !quote || !customer) return;
     setBusy(true);
     try {
-      const job = await acceptQuoteAndActivateJob(user.id, quote, customer);
+      const job = await acceptQuoteAndActivateJob(user.id, quote, {
+        startAt: startAt.toISOString(),
+        addToCalendar,
+        customer,
+      });
+      setAcceptModalVisible(false);
       router.push(`/job/${job.id}`);
     } catch (error) {
       Alert.alert('Could not accept quote', pipelineErrorMessage(error));
@@ -72,27 +93,71 @@ export default function QuoteDetailScreen() {
   if (loading || !quote) return <View style={styles.center}><ActivityIndicator color={colors.textPrimary} /></View>;
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{quote.title}</Text>
-        <StatusBadge label={quote.status} status={quote.status} />
-      </View>
-      <Text style={styles.meta}>{quote.reference} · {customer?.name}</Text>
-      {invoicedRef ? <Text style={styles.meta}>Invoiced as {invoicedRef}</Text> : null}
-      <Text style={styles.amount}>{formatMoney(Number(quote.amount))}</Text>
-      {quote.description ? <Card style={styles.card}><Text style={styles.body}>{quote.description}</Text></Card> : null}
-      <Pressable style={[styles.btn, busy && styles.btnDisabled]} disabled={busy} onPress={handleSendQuote}>
-        <Text style={styles.btnText}>{quote.status === 'sent' ? 'Resend quote PDF' : 'Send quote PDF & email'}</Text>
-      </Pressable>
-      <Pressable style={[styles.btnSecondary, busy && styles.btnDisabled]} disabled={busy} onPress={handleAccept}>
-        <Text style={styles.btnSecondaryText}>Client accepted → Activate job</Text>
-      </Pressable>
-      <Pressable style={styles.btnSecondary} onPress={async () => {
-        if (!user?.id) return;
-        await updateQuote(user.id, quote.id, { status: 'rejected' });
-        load();
-      }}><Text style={styles.btnSecondaryText}>Mark rejected</Text></Pressable>
-    </ScrollView>
+    <>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.title}>{quote.title}</Text>
+          <StatusBadge label={quote.status} status={quote.status} />
+        </View>
+        <Text style={styles.meta}>{quote.reference} · {customer?.name}</Text>
+        {invoicedRef ? <Text style={styles.meta}>Invoiced as {invoicedRef}</Text> : null}
+        <Text style={styles.amount}>{formatMoney(Number(quote.amount))}</Text>
+        {quote.description ? <Card style={styles.card}><Text style={styles.body}>{quote.description}</Text></Card> : null}
+        <Pressable style={[styles.btn, busy && styles.btnDisabled]} disabled={busy} onPress={handleSendQuote}>
+          <Text style={styles.btnText}>{quote.status === 'sent' ? 'Re-send quote' : 'Send quote'}</Text>
+        </Pressable>
+        <Pressable
+          style={styles.btnSecondary}
+          onPress={() => router.push({ pathname: '/quote/new', params: { quoteId: quote.id } })}
+        >
+          <Text style={styles.btnSecondaryText}>Edit quote</Text>
+        </Pressable>
+        <Pressable style={[styles.btnSecondary, busy && styles.btnDisabled]} disabled={busy} onPress={() => setAcceptModalVisible(true)}>
+          <Text style={styles.btnSecondaryText}>Client accepted → Activate job</Text>
+        </Pressable>
+        <Pressable style={styles.btnSecondary} onPress={async () => {
+          if (!user?.id) return;
+          await updateQuote(user.id, quote.id, { status: 'rejected' });
+          load();
+        }}><Text style={styles.btnSecondaryText}>Mark rejected</Text></Pressable>
+      </ScrollView>
+
+      <Modal visible={acceptModalVisible} transparent animationType="slide" onRequestClose={() => setAcceptModalVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setAcceptModalVisible(false)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>Job start date</Text>
+            <Pressable style={styles.dateBtn} onPress={() => setShowStartPicker(true)}>
+              <Text style={styles.dateText}>{startAt.toLocaleString('en-GB')}</Text>
+            </Pressable>
+            {showStartPicker ? (
+              <>
+                <DateTimePicker
+                  value={startAt}
+                  mode="datetime"
+                  themeVariant="dark"
+                  onChange={(_e, d) => d && setStartAt(d)}
+                />
+                {Platform.OS === 'ios' ? (
+                  <Pressable onPress={() => setShowStartPicker(false)}>
+                    <Text style={styles.done}>Done</Text>
+                  </Pressable>
+                ) : null}
+              </>
+            ) : null}
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Add to calendar</Text>
+              <Switch value={addToCalendar} onValueChange={setAddToCalendar} />
+            </View>
+            <Pressable style={[styles.btn, busy && styles.btnDisabled]} disabled={busy} onPress={handleAccept}>
+              <Text style={styles.btnText}>Activate job</Text>
+            </Pressable>
+            <Pressable style={styles.btnSecondary} onPress={() => setAcceptModalVisible(false)}>
+              <Text style={styles.btnSecondaryText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -110,4 +175,12 @@ const styles = StyleSheet.create({
   btnText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
   btnSecondary: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 12, padding: spacing.md, alignItems: 'center', marginBottom: spacing.sm },
   btnSecondaryText: { ...typography.label, color: colors.textPrimary },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: spacing.lg },
+  modalTitle: { ...typography.heading, color: colors.textPrimary, marginBottom: spacing.md },
+  dateBtn: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 10, padding: spacing.md, marginBottom: spacing.sm },
+  dateText: { ...typography.body, color: colors.textPrimary },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+  switchLabel: { ...typography.body, color: colors.textPrimary },
+  done: { ...typography.caption, color: colors.textPrimary, textAlign: 'right', marginBottom: spacing.sm },
 });

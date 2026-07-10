@@ -1,5 +1,7 @@
 import { scheduleAfterJobReminder, scheduleAfterPaidReminder, syncCustomerPaidTotal } from '@/lib/automations';
+import { addJobEventToCalendar } from '@/lib/calendar';
 import { generateAndEmailDocument, type DocumentDetails } from '@/lib/documents';
+import { cancelJobStartReminders, scheduleJobStartReminders } from '@/lib/jobReminders';
 import { createInvoice, updateInvoice } from '@/lib/invoices';
 import {
   createJob,
@@ -61,7 +63,6 @@ function receiptDocumentDetails(invoice: Invoice, amount: number): DocumentDetai
   };
 }
 
-/** Send quote PDF via mail, mark quote sent, move linked job to Quoted. */
 export async function sendQuoteByEmail(
   userId: string,
   profile: Profile,
@@ -81,50 +82,81 @@ export async function sendQuoteByEmail(
   return updated;
 }
 
-/** Accept quote: activate job (or create one) and set pipeline Active. */
+export type AcceptQuoteOptions = {
+  startAt: string;
+  addToCalendar?: boolean;
+  customer: Customer;
+};
+
 export async function acceptQuoteAndActivateJob(
   userId: string,
   quote: Quote,
-  customer: Customer,
+  options: AcceptQuoteOptions,
 ): Promise<Job> {
+  const { startAt, addToCalendar, customer } = options;
   await updateQuote(userId, quote.id, { status: 'accepted' });
 
+  const jobPayload = {
+    status: 'upcoming' as const,
+    pipeline_status: 'active' as const,
+    price: quote.amount,
+    start_at: startAt,
+    scheduled_at: startAt,
+  };
+
+  let job: Job;
   if (quote.job_id) {
     const existing = await fetchJob(userId, quote.job_id);
     if (existing?.pipeline_status === 'lead') {
       await updateJobPipeline(userId, quote.job_id, 'quoted');
     }
-    const job = await updateJob(userId, quote.job_id, {
+    job = await updateJob(userId, quote.job_id, jobPayload);
+  } else {
+    job = await createJob(userId, {
+      customer_id: quote.customer_id,
+      reference: generateJobReference(),
+      title: quote.title,
+      description: quote.description,
+      scheduled_at: startAt,
+      duration_minutes: null,
+      address_line1: customer.address_line1,
+      city: customer.city,
+      postcode: customer.postcode,
       status: 'upcoming',
       pipeline_status: 'active',
       price: quote.amount,
+      materials: null,
+      notes: null,
+      visit_required: null,
+      visit_at: null,
+      start_at: startAt,
+      work_completed_notes: null,
+      additional_works: null,
+      additional_materials: null,
+      deleted_at: null,
+      job_notification_ids: null,
+      quote_id: quote.id,
+      property_id: null,
     });
-    return job;
+    await updateQuote(userId, quote.id, { job_id: job.id });
   }
 
-  const job = await createJob(userId, {
-    customer_id: quote.customer_id,
-    reference: generateJobReference(),
-    title: quote.title,
-    description: quote.description,
-    scheduled_at: new Date().toISOString(),
-    duration_minutes: null,
-    address_line1: customer.address_line1,
-    city: customer.city,
-    postcode: customer.postcode,
-    status: 'upcoming',
-    pipeline_status: 'active',
-    price: quote.amount,
-    materials: null,
-    notes: null,
-    quote_id: quote.id,
-    property_id: null,
-  });
-  await updateQuote(userId, quote.id, { job_id: job.id });
+  if (addToCalendar) {
+    await addJobEventToCalendar({
+      title: job.title,
+      startDate: new Date(startAt),
+      location: [customer.address_line1, customer.city].filter(Boolean).join(', '),
+      notes: 'TradeKeepCRM job start',
+    });
+  }
+
+  await cancelJobStartReminders(job.job_notification_ids);
+  const job_notification_ids = await scheduleJobStartReminders(job.id, job.title, startAt);
+  job = await updateJob(userId, job.id, { job_notification_ids });
+
   return job;
 }
 
-/** Raise invoice: email PDF, create invoice row, mark job Complete. */
 export async function raiseInvoiceForJob(
   userId: string,
   profile: Profile,
@@ -156,8 +188,8 @@ export async function raiseInvoiceForJob(
   });
 
   const updatedJob = await updateJob(userId, currentJob.id, {
-    status: 'completed',
-    pipeline_status: 'complete',
+    status: 'in_progress',
+    pipeline_status: 'invoiced',
   });
   await syncLastAppointmentFromJob(userId, job.customer_id, updatedJob);
   await scheduleAfterJobReminder(userId, job.customer_id, updatedJob.scheduled_at);
@@ -165,14 +197,13 @@ export async function raiseInvoiceForJob(
   return invoice;
 }
 
-/** Log payment, email receipt, mark invoice paid (DB trigger closes job). */
 export async function logPaymentWithReceipt(
   userId: string,
   profile: Profile,
   client: Customer,
   invoice: Invoice,
   amount: number,
-): Promise<void> {
+): Promise<Job | null> {
   await createPayment(userId, {
     customer_id: invoice.customer_id,
     invoice_id: invoice.id,
@@ -189,4 +220,64 @@ export async function logPaymentWithReceipt(
 
   const doc = receiptDocumentDetails(invoice, amount);
   await generateAndEmailDocument(profile, client, doc);
+
+  if (invoice.job_id) {
+    const job = await fetchJob(userId, invoice.job_id);
+    return job;
+  }
+  return null;
+}
+
+export async function saveVisitPlan(
+  userId: string,
+  job: Job,
+  visitRequired: boolean,
+  visitAt: string | null,
+  addToCalendar?: boolean,
+  customer?: Customer,
+): Promise<Job> {
+  const updated = await updateJob(userId, job.id, {
+    visit_required: visitRequired,
+    visit_at: visitRequired ? visitAt : null,
+    scheduled_at: visitRequired && visitAt ? visitAt : job.scheduled_at,
+  });
+
+  if (visitRequired && visitAt && addToCalendar && customer) {
+    await addJobEventToCalendar({
+      title: `Site visit: ${job.title}`,
+      startDate: new Date(visitAt),
+      location: [customer.address_line1, customer.city].filter(Boolean).join(', '),
+      notes: 'TradeKeepCRM client visit',
+    });
+  }
+
+  return updated;
+}
+
+export async function rescheduleJobStart(
+  userId: string,
+  job: Job,
+  startAt: string,
+  addToCalendar?: boolean,
+  customer?: Customer,
+): Promise<Job> {
+  await cancelJobStartReminders(job.job_notification_ids);
+  const job_notification_ids = await scheduleJobStartReminders(job.id, job.title, startAt);
+
+  const updated = await updateJob(userId, job.id, {
+    start_at: startAt,
+    scheduled_at: startAt,
+    job_notification_ids,
+  });
+
+  if (addToCalendar && customer) {
+    await addJobEventToCalendar({
+      title: job.title,
+      startDate: new Date(startAt),
+      location: [customer.address_line1, customer.city].filter(Boolean).join(', '),
+      notes: 'TradeKeepCRM job start',
+    });
+  }
+
+  return updated;
 }

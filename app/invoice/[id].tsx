@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { Card } from '@/components/Card';
+import { JobCompleteCelebration } from '@/components/JobCompleteCelebration';
 import { StatusBadge } from '@/components/StatusBadge';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +22,7 @@ export default function InvoiceDetailScreen() {
   const [linkedQuoteRef, setLinkedQuoteRef] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.id || !id) return;
@@ -51,12 +53,21 @@ export default function InvoiceDetailScreen() {
     try {
       const customer = await fetchCustomer(user.id, invoice.customer_id);
       if (!customer) throw new Error('Client not found');
-      await logPaymentWithReceipt(user.id, profile, customer, invoice, amount);
-      Alert.alert('Payment recorded', 'Receipt PDF opened in your mail app. Job will close automatically.');
+      const job = await logPaymentWithReceipt(user.id, profile, customer, invoice, amount);
+      if (job?.pipeline_status === 'complete') {
+        setShowCelebration(true);
+      } else {
+        Alert.alert('Payment recorded', 'Receipt PDF opened in your mail app.');
+      }
       load();
     } catch (error) {
       Alert.alert('Could not record payment', pipelineErrorMessage(error));
     }
+  };
+
+  const handleCelebrationDismiss = () => {
+    setShowCelebration(false);
+    router.replace({ pathname: '/(tabs)/jobs', params: { tab: 'completed' } });
   };
 
   const handleDuplicate = async () => {
@@ -70,25 +81,29 @@ export default function InvoiceDetailScreen() {
   const status = effectiveInvoiceStatus(invoice);
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{invoice.title}</Text>
-        <StatusBadge label={status} status={status} />
-      </View>
-      <Text style={styles.meta}>{invoice.reference} · {customerName}</Text>
-      {linkedQuoteRef ? <Text style={styles.meta}>Quote {linkedQuoteRef}</Text> : null}
-      <Text style={styles.amount}>{formatMoney(Number(invoice.amount))}</Text>
+    <>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.title}>{invoice.title}</Text>
+          <StatusBadge label={status} status={status} />
+        </View>
+        <Text style={styles.meta}>{invoice.reference} · {customerName}</Text>
+        {linkedQuoteRef ? <Text style={styles.meta}>Quote {linkedQuoteRef}</Text> : null}
+        <Text style={styles.amount}>{formatMoney(Number(invoice.amount))}</Text>
 
-      <Card style={styles.card}>
-        <Text style={styles.label}>Record payment</Text>
-        <TextInput style={styles.input} value={paymentAmount} onChangeText={setPaymentAmount} keyboardType="decimal-pad" placeholder="Amount" placeholderTextColor={colors.textMuted} />
-        <Pressable style={styles.btn} onPress={recordPayment}><Text style={styles.btnText}>Mark paid</Text></Pressable>
-      </Card>
+        <Card style={styles.card}>
+          <Text style={styles.label}>Record payment</Text>
+          <TextInput style={styles.input} value={paymentAmount} onChangeText={setPaymentAmount} keyboardType="decimal-pad" placeholder="Amount" placeholderTextColor={colors.textMuted} />
+          <Pressable style={styles.btn} onPress={recordPayment}><Text style={styles.btnText}>Mark paid</Text></Pressable>
+        </Card>
 
-      <Pressable style={styles.btnSecondary} onPress={handleDuplicate}>
-        <Text style={styles.btnSecondaryText}>Duplicate invoice</Text>
-      </Pressable>
-    </ScrollView>
+        <Pressable style={styles.btnSecondary} onPress={handleDuplicate}>
+          <Text style={styles.btnSecondaryText}>Duplicate invoice</Text>
+        </Pressable>
+      </ScrollView>
+
+      <JobCompleteCelebration visible={showCelebration} onDismiss={handleCelebrationDismiss} />
+    </>
   );
 }
 

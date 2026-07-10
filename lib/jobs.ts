@@ -9,10 +9,37 @@ export async function fetchJobs(userId: string): Promise<Job[]> {
     .from('jobs')
     .select('*')
     .eq('user_id', userId)
+    .is('deleted_at', null)
     .order('scheduled_at', { ascending: true });
 
   if (error) throw error;
   return data ?? [];
+}
+
+export async function fetchArchivedJobs(userId: string): Promise<Job[]> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('user_id', userId)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function archiveJob(userId: string, jobId: string): Promise<void> {
+  const { error } = await supabase
+    .from('jobs')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('id', jobId);
+  if (error) throw error;
+}
+
+export async function permanentlyDeleteJob(userId: string, jobId: string): Promise<void> {
+  const { error } = await supabase.from('jobs').delete().eq('user_id', userId).eq('id', jobId);
+  if (error) throw error;
 }
 
 export async function fetchJobsForCustomer(userId: string, customerId: string): Promise<Job[]> {
@@ -72,8 +99,7 @@ export async function updateJobPipeline(
 }
 
 export async function deleteJob(userId: string, jobId: string): Promise<void> {
-  const { error } = await supabase.from('jobs').delete().eq('user_id', userId).eq('id', jobId);
-  if (error) throw error;
+  await archiveJob(userId, jobId);
 }
 
 export function isJobToday(scheduledAt: string): boolean {
@@ -90,18 +116,24 @@ export function filterJobsByTab(jobs: Job[], tab: 'upcoming' | 'today' | 'in_pro
   const now = new Date();
   switch (tab) {
     case 'today':
-      return jobs.filter((j) => j.status !== 'cancelled' && j.status !== 'completed' && isJobToday(j.scheduled_at));
+      return jobs.filter(
+        (j) =>
+          j.pipeline_status !== 'complete' &&
+          j.status !== 'cancelled' &&
+          isJobToday(j.start_at ?? j.scheduled_at),
+      );
     case 'upcoming':
       return jobs.filter(
         (j) =>
+          j.pipeline_status === 'active' &&
           j.status === 'upcoming' &&
-          !isJobToday(j.scheduled_at) &&
-          new Date(j.scheduled_at) >= now,
+          !isJobToday(j.start_at ?? j.scheduled_at) &&
+          new Date(j.start_at ?? j.scheduled_at) >= now,
       );
     case 'in_progress':
-      return jobs.filter((j) => j.status === 'in_progress');
+      return jobs.filter((j) => j.status === 'in_progress' || j.pipeline_status === 'invoiced');
     case 'completed':
-      return jobs.filter((j) => j.status === 'completed');
+      return jobs.filter((j) => j.pipeline_status === 'complete');
     case 'cancelled':
       return jobs.filter((j) => j.status === 'cancelled');
     default:
@@ -139,6 +171,14 @@ export async function duplicateJob(userId: string, job: Job): Promise<Job> {
     price: job.price,
     materials: job.materials,
     notes: job.notes,
+    visit_required: null,
+    visit_at: null,
+    start_at: nextWeek.toISOString(),
+    work_completed_notes: null,
+    additional_works: null,
+    additional_materials: null,
+    deleted_at: null,
+    job_notification_ids: null,
     quote_id: null,
     property_id: job.property_id,
   });

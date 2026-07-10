@@ -5,7 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 
 import { Card } from '@/components/Card';
 import { colors, radii, spacing, typography } from '@/constants/theme';
-import { followUpLabel, formatRelativeDate, getFollowUpUrgency } from '@/lib/dates';
+import { followUpLabel, getFollowUpUrgency } from '@/lib/dates';
 import { formatAddress } from '@/lib/search';
 import type { Customer } from '@/types/database';
 
@@ -21,7 +21,9 @@ export function CustomerRow({ customer, balanceOwing }: CustomerRowProps) {
     <Pressable onPress={() => router.push(`/customer/${customer.id}`)}>
       <Card style={styles.row}>
         <View style={styles.header}>
-          <Text style={styles.name}>{customer.is_favourite ? `⭐ ${customer.name}` : customer.name}</Text>
+          <Text style={styles.name}>
+            {customer.is_favourite ? `${customer.name} (Favourite)` : customer.name}
+          </Text>
           {urgency !== 'none' && urgency !== 'later' ? (
             <View style={styles.badge}>
               <Text style={[styles.badgeText, urgency === 'overdue' && styles.badgeUrgent]}>
@@ -31,8 +33,6 @@ export function CustomerRow({ customer, balanceOwing }: CustomerRowProps) {
           ) : null}
         </View>
         {customer.phone ? <Text style={styles.meta}>{customer.phone}</Text> : null}
-        {customer.next_action ? <Text style={styles.nextAction}>→ {customer.next_action}</Text> : null}
-        <Text style={styles.meta}>Last visit: {formatRelativeDate(customer.last_appointment)}</Text>
         {customer.follow_up_at ? <Text style={styles.meta}>{followUpLabel(customer.follow_up_at)}</Text> : null}
         {customer.notes ? <Text style={styles.notes} numberOfLines={1}>{customer.notes}</Text> : null}
         {balanceOwing != null && balanceOwing > 0 ? (

@@ -60,7 +60,7 @@ export async function fetchSmartHomeItems(userId: string): Promise<SmartHomeItem
     if (job.status !== 'completed' && job.status !== 'cancelled' && d >= today && d < tomorrow) {
       items.push({
         id: `job-${job.id}`,
-        icon: '✅',
+        icon: '',
         title: `${job.title} at ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
         route: `/job/${job.id}`,
         priority: 1,
@@ -74,7 +74,7 @@ export async function fetchSmartHomeItems(userId: string): Promise<SmartHomeItem
       if (due <= tomorrow) {
         items.push({
           id: `action-${c.id}`,
-          icon: '📞',
+          icon: '',
           title: `${c.next_action} — ${c.name}`,
           route: `/customer/${c.id}`,
           priority: 2,
@@ -87,7 +87,7 @@ export async function fetchSmartHomeItems(userId: string): Promise<SmartHomeItem
     if (effectiveInvoiceStatus(inv) === 'overdue') {
       items.push({
         id: `inv-${inv.id}`,
-        icon: '💷',
+        icon: '',
         title: `Invoice £${Number(inv.amount).toFixed(0)} overdue — ${inv.title}`,
         route: `/invoice/${inv.id}`,
         priority: 3,
@@ -102,7 +102,7 @@ export async function fetchSmartHomeItems(userId: string): Promise<SmartHomeItem
       if (diff >= 0 && diff <= 1 && q.status === 'sent') {
         items.push({
           id: `quote-${q.id}`,
-          icon: '📄',
+          icon: '',
           title: `Quote expires ${diff === 0 ? 'today' : 'tomorrow'} — ${q.title}`,
           route: `/quote/${q.id}`,
           priority: 4,
@@ -114,7 +114,7 @@ export async function fetchSmartHomeItems(userId: string): Promise<SmartHomeItem
   for (const lead of leads.filter((l) => l.status === 'new').slice(0, 3)) {
     items.push({
       id: `lead-${lead.id}`,
-      icon: '🆕',
+      icon: '',
       title: `New enquiry: ${lead.name}`,
       route: `/lead/${lead.id}`,
       priority: 5,
