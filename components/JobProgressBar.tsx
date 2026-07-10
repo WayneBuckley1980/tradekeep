@@ -1,5 +1,4 @@
 import { Fragment } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -46,7 +45,7 @@ export function JobProgressBar({ currentStatus }: JobProgressBarProps) {
               <View style={styles.step}>
                 {done ? (
                   <LinearGradient colors={[GOLD, GOLD_LIGHT]} style={styles.circleDone}>
-                    <Ionicons name="checkmark" size={14} color="#1A1A1A" />
+                    <Text style={styles.checkmark}>✓</Text>
                   </LinearGradient>
                 ) : (
                   <View style={styles.circlePending}>
@@ -106,6 +105,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  checkmark: {
+    color: '#1A1A1A',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 16,
   },
   circlePending: {
     width: 28,
