@@ -12,7 +12,7 @@ import {
   updateJobPipeline,
 } from '@/lib/jobs';
 import { createPayment } from '@/lib/payments';
-import { fetchQuoteLineItems } from '@/lib/quoteItems';
+import { fetchQuoteLineItems, formatQuoteLineItemLabel } from '@/lib/quoteItems';
 import { updateQuote } from '@/lib/quotes';
 import { generateInvoiceReference } from '@/lib/references';
 import type { Customer, Invoice, Job, Profile, Quote } from '@/types/database';
@@ -70,7 +70,13 @@ export async function sendQuoteByEmail(
   quote: Quote,
 ): Promise<Quote> {
   const lineItems = await fetchQuoteLineItems(userId, quote.id);
-  const doc = quoteDocumentDetails(quote, lineItems.map((i) => ({ label: i.label, amount: Number(i.amount) })));
+  const doc = quoteDocumentDetails(
+    quote,
+    lineItems.map((i) => ({
+      label: formatQuoteLineItemLabel(i.label, i.duration_qty, i.duration_unit),
+      amount: Number(i.amount),
+    })),
+  );
   await generateAndEmailDocument(profile, client, doc);
 
   const updated = await updateQuote(userId, quote.id, {

@@ -1,4 +1,11 @@
-import type { BusinessType, WorkLocationType } from '@/types/database';
+import type { BusinessType, QuoteDurationUnit, WorkLocationType } from '@/types/database';
+
+export type QuoteLineItemDraft = {
+  label: string;
+  amount: string;
+  durationQty: string;
+  durationUnit: QuoteDurationUnit | '';
+};
 
 export type Terminology = {
   client: string;
@@ -20,6 +27,14 @@ export type Terminology = {
   workflowWork: string;
   workflowInvoice: string;
   workflowClosed: string;
+  serviceExample: string;
+  clientNotesExample: string;
+  jobAddressPlaceholder: string;
+  workCompleted: string;
+  additionalWorks: string;
+  additionalMaterials: string;
+  quoteDescriptionExample: string;
+  defaultDurationUnit: QuoteDurationUnit;
 };
 
 const BASE: Terminology = {
@@ -42,6 +57,14 @@ const BASE: Terminology = {
   workflowWork: 'Work completed',
   workflowInvoice: 'Invoice raised',
   workflowClosed: 'Job closed',
+  serviceExample: 'Bathroom refurbishment quote',
+  clientNotesExample: 'Gate code, parking, access notes…',
+  jobAddressPlaceholder: 'Job address',
+  workCompleted: 'Work completed',
+  additionalWorks: 'Additional works',
+  additionalMaterials: 'Materials used',
+  quoteDescriptionExample: 'Scope of work and what is included',
+  defaultDurationUnit: 'mins',
 };
 
 const MAP: Record<BusinessType, Partial<Terminology>> = {
@@ -50,10 +73,16 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     job: 'Appointment',
     jobs: 'Appointments',
     materials: 'Products used',
-    siteNotes: 'Colour notes',
+    siteNotes: 'Colour & style notes',
     serviceReminder: 'Rebooking reminder',
     addJob: 'New appointment',
     todaysJobs: "Today's appointments",
+    serviceExample: 'Cut and colour',
+    clientNotesExample: 'Colour history, allergies, preferred style…',
+    jobAddressPlaceholder: 'Salon or client address',
+    additionalMaterials: 'Products used',
+    quoteDescriptionExample: 'Services included and aftercare',
+    defaultDurationUnit: 'mins',
   },
   beauty: {
     job: 'Appointment',
@@ -63,6 +92,12 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     serviceReminder: 'Rebooking reminder',
     addJob: 'New appointment',
     todaysJobs: "Today's appointments",
+    serviceExample: 'Facial and brow treatment',
+    clientNotesExample: 'Skin type, sensitivities, patch test date…',
+    jobAddressPlaceholder: 'Salon or client address',
+    additionalMaterials: 'Products used',
+    quoteDescriptionExample: 'Treatment plan and products included',
+    defaultDurationUnit: 'mins',
   },
   pt: {
     job: 'Session',
@@ -71,6 +106,13 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     serviceReminder: 'Next session',
     addJob: 'New session',
     todaysJobs: "Today's sessions",
+    serviceExample: '8-week training block',
+    clientNotesExample: 'Injuries, goals, gym access…',
+    jobAddressPlaceholder: 'Gym, park, or client address',
+    workCompleted: 'Session summary',
+    additionalWorks: 'Extra sessions',
+    quoteDescriptionExample: 'Programme outline and session frequency',
+    defaultDurationUnit: 'mins',
   },
   photographer: {
     job: 'Booking',
@@ -79,6 +121,13 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     serviceReminder: 'Delivery reminder',
     addJob: 'New booking',
     todaysJobs: 'Upcoming shoots',
+    serviceExample: 'Family portrait shoot',
+    clientNotesExample: 'Location ideas, shot list, wardrobe…',
+    jobAddressPlaceholder: 'Shoot location',
+    materials: 'Deliverables',
+    additionalMaterials: 'Prints & licences',
+    quoteDescriptionExample: 'Hours covered, editing, and delivery',
+    defaultDurationUnit: 'days',
   },
   dog_groomer: {
     job: 'Groom',
@@ -89,6 +138,12 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     todaysJobs: "Today's grooms",
     workflowOrder: 'Booking confirmed',
     workflowWork: 'Groom completed',
+    serviceExample: 'Full groom for medium dog',
+    clientNotesExample: 'Breed, temperament, skin issues…',
+    jobAddressPlaceholder: 'Salon or mobile visit address',
+    additionalMaterials: 'Coat treatments',
+    quoteDescriptionExample: 'Groom package and coat condition notes',
+    defaultDurationUnit: 'mins',
   },
   dog_walker: {
     client: 'Client',
@@ -106,6 +161,15 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     workflowWork: 'Walk completed',
     workflowInvoice: 'Invoice raised',
     workflowClosed: 'Walk closed',
+    materials: 'Extras',
+    serviceExample: 'Weekly dog walking (5 walks)',
+    clientNotesExample: 'Dog names, keys, vet contact, reactivity…',
+    jobAddressPlaceholder: 'Pick-up address',
+    workCompleted: 'Walk report',
+    additionalWorks: 'Extra walks',
+    additionalMaterials: 'Holiday cover',
+    quoteDescriptionExample: 'Walk schedule, group or solo, pick-up times',
+    defaultDurationUnit: 'weeks',
   },
   dog_trainer: {
     client: 'Client',
@@ -123,6 +187,13 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     workflowWork: 'Session completed',
     workflowInvoice: 'Invoice raised',
     workflowClosed: 'Training closed',
+    serviceExample: '6-week puppy training course',
+    clientNotesExample: 'Behaviour issues, goals, other pets…',
+    jobAddressPlaceholder: 'Training location',
+    workCompleted: 'Session notes',
+    additionalWorks: 'Extra sessions',
+    quoteDescriptionExample: 'Training plan, homework, and session length',
+    defaultDurationUnit: 'weeks',
   },
   cleaning: {
     job: 'Visit',
@@ -131,14 +202,26 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     serviceReminder: 'Next visit',
     addJob: 'New visit',
     todaysJobs: "Today's visits",
+    serviceExample: 'Fortnightly house clean',
+    clientNotesExample: 'Alarm codes, pets, priority rooms…',
+    jobAddressPlaceholder: 'Property address',
+    additionalMaterials: 'Cleaning supplies',
+    quoteDescriptionExample: 'Rooms included and visit frequency',
+    defaultDurationUnit: 'weeks',
   },
   gardening: {
     job: 'Visit',
     jobs: 'Visits',
-    materials: 'Materials',
+    materials: 'Plants & supplies',
     siteNotes: 'Garden notes',
     addJob: 'New visit',
     todaysJobs: "Today's visits",
+    serviceExample: 'Monthly garden maintenance',
+    clientNotesExample: 'Access, green waste, lawn areas…',
+    jobAddressPlaceholder: 'Property address',
+    additionalMaterials: 'Plants & supplies',
+    quoteDescriptionExample: 'Tasks each visit and waste removal',
+    defaultDurationUnit: 'months',
   },
   tutor: {
     client: 'Student',
@@ -148,6 +231,12 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     siteNotes: 'Lesson notes',
     addJob: 'New lesson',
     todaysJobs: "Today's lessons",
+    serviceExample: 'GCSE maths weekly lesson',
+    clientNotesExample: 'Exam board, weak topics, parent contact…',
+    jobAddressPlaceholder: 'Lesson location',
+    materials: 'Learning materials',
+    quoteDescriptionExample: 'Subject, level, and term length',
+    defaultDurationUnit: 'weeks',
   },
   mechanic: {
     job: 'Service',
@@ -157,6 +246,12 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     serviceReminder: 'Next service',
     addJob: 'New service',
     todaysJobs: "Today's services",
+    serviceExample: 'Full service and brake check',
+    clientNotesExample: 'Registration, mileage, known faults…',
+    jobAddressPlaceholder: 'Vehicle location',
+    additionalMaterials: 'Parts supplied',
+    quoteDescriptionExample: 'Work required and parts allowance',
+    defaultDurationUnit: 'mins',
   },
   freelance: {
     job: 'Project',
@@ -164,13 +259,28 @@ const MAP: Record<BusinessType, Partial<Terminology>> = {
     siteNotes: 'Project notes',
     addJob: 'New project',
     todaysJobs: 'Active projects',
+    serviceExample: 'Website design project',
+    clientNotesExample: 'Brief, deadlines, stakeholders…',
+    jobAddressPlaceholder: 'Client site or remote',
+    workCompleted: 'Deliverables completed',
+    additionalWorks: 'Change requests',
+    quoteDescriptionExample: 'Scope, milestones, and timeline',
+    defaultDurationUnit: 'weeks',
   },
   property: {
     job: 'Job',
     siteNotes: 'Property notes',
     todaysJobs: "Today's jobs",
+    serviceExample: 'Property inspection report',
+    clientNotesExample: 'Tenant access, keys, report deadline…',
+    jobAddressPlaceholder: 'Property address',
+    quoteDescriptionExample: 'Inspection type and turnaround',
+    defaultDurationUnit: 'days',
   },
-  other: {},
+  other: {
+    serviceExample: 'Describe the service needed',
+    quoteDescriptionExample: 'What is included in this quote',
+  },
 };
 
 export function getTerminology(businessType: BusinessType | null | undefined): Terminology {
@@ -253,3 +363,93 @@ export const DEFAULT_JOB_TEMPLATES: Record<BusinessType, { title: string; durati
     { title: 'Standard job', duration_minutes: 60, materials: '', suggested_price: 100 },
   ],
 };
+
+export const QUOTE_DURATION_UNITS: { id: QuoteDurationUnit; label: string }[] = [
+  { id: 'mins', label: 'mins' },
+  { id: 'days', label: 'days' },
+  { id: 'weeks', label: 'weeks' },
+  { id: 'months', label: 'months' },
+];
+
+export const DEFAULT_QUOTE_LINE_ITEMS: Record<BusinessType, QuoteLineItemDraft[]> = {
+  trades: [
+    { label: 'Labour', amount: '', durationQty: '1', durationUnit: 'days' },
+    { label: 'Materials', amount: '', durationQty: '', durationUnit: '' },
+    { label: 'Waste disposal', amount: '', durationQty: '', durationUnit: '' },
+  ],
+  hair: [
+    { label: 'Cut & style', amount: '', durationQty: '45', durationUnit: 'mins' },
+    { label: 'Colour / treatment', amount: '', durationQty: '90', durationUnit: 'mins' },
+    { label: 'Product top-up', amount: '', durationQty: '', durationUnit: '' },
+  ],
+  beauty: [
+    { label: 'Treatment', amount: '', durationQty: '60', durationUnit: 'mins' },
+    { label: 'Products used', amount: '', durationQty: '', durationUnit: '' },
+    { label: 'Consultation', amount: '', durationQty: '15', durationUnit: 'mins' },
+  ],
+  pt: [
+    { label: 'Training session', amount: '', durationQty: '60', durationUnit: 'mins' },
+    { label: 'Programme plan', amount: '', durationQty: '4', durationUnit: 'weeks' },
+    { label: 'Nutrition check-in', amount: '', durationQty: '30', durationUnit: 'mins' },
+  ],
+  photographer: [
+    { label: 'Shoot fee', amount: '', durationQty: '2', durationUnit: 'days' },
+    { label: 'Editing & retouching', amount: '', durationQty: '5', durationUnit: 'days' },
+    { label: 'Print / licence package', amount: '', durationQty: '', durationUnit: '' },
+  ],
+  dog_groomer: [
+    { label: 'Full groom', amount: '', durationQty: '90', durationUnit: 'mins' },
+    { label: 'Nail trim & ears', amount: '', durationQty: '15', durationUnit: 'mins' },
+    { label: 'De-shed treatment', amount: '', durationQty: '', durationUnit: '' },
+  ],
+  dog_walker: [
+    { label: 'Solo walk (1 dog)', amount: '', durationQty: '60', durationUnit: 'mins' },
+    { label: 'Weekly walks (5 days)', amount: '', durationQty: '1', durationUnit: 'weeks' },
+    { label: 'Monthly walking package', amount: '', durationQty: '1', durationUnit: 'months' },
+  ],
+  dog_trainer: [
+    { label: '1-to-1 training session', amount: '', durationQty: '60', durationUnit: 'mins' },
+    { label: '6-week training course', amount: '', durationQty: '6', durationUnit: 'weeks' },
+    { label: 'Home visit assessment', amount: '', durationQty: '90', durationUnit: 'mins' },
+  ],
+  cleaning: [
+    { label: 'Regular clean', amount: '', durationQty: '2', durationUnit: 'weeks' },
+    { label: 'Deep clean', amount: '', durationQty: '240', durationUnit: 'mins' },
+    { label: 'Cleaning supplies', amount: '', durationQty: '', durationUnit: '' },
+  ],
+  gardening: [
+    { label: 'Garden maintenance visit', amount: '', durationQty: '1', durationUnit: 'months' },
+    { label: 'Lawn & hedge work', amount: '', durationQty: '1', durationUnit: 'days' },
+    { label: 'Green waste removal', amount: '', durationQty: '', durationUnit: '' },
+  ],
+  tutor: [
+    { label: 'Lesson', amount: '', durationQty: '60', durationUnit: 'mins' },
+    { label: 'Term block (10 lessons)', amount: '', durationQty: '10', durationUnit: 'weeks' },
+    { label: 'Workbooks & materials', amount: '', durationQty: '', durationUnit: '' },
+  ],
+  mechanic: [
+    { label: 'Labour', amount: '', durationQty: '120', durationUnit: 'mins' },
+    { label: 'Parts', amount: '', durationQty: '', durationUnit: '' },
+    { label: 'Oil & fluids disposal', amount: '', durationQty: '', durationUnit: '' },
+  ],
+  freelance: [
+    { label: 'Project fee', amount: '', durationQty: '2', durationUnit: 'weeks' },
+    { label: 'Revisions allowance', amount: '', durationQty: '5', durationUnit: 'days' },
+    { label: 'Expenses', amount: '', durationQty: '', durationUnit: '' },
+  ],
+  property: [
+    { label: 'Inspection visit', amount: '', durationQty: '90', durationUnit: 'mins' },
+    { label: 'Written report', amount: '', durationQty: '3', durationUnit: 'days' },
+    { label: 'Travel', amount: '', durationQty: '', durationUnit: '' },
+  ],
+  other: [
+    { label: 'Service', amount: '', durationQty: '1', durationUnit: 'days' },
+    { label: 'Materials', amount: '', durationQty: '', durationUnit: '' },
+    { label: 'Other', amount: '', durationQty: '', durationUnit: '' },
+  ],
+};
+
+export function getDefaultQuoteLineItems(businessType: BusinessType | null | undefined): QuoteLineItemDraft[] {
+  const items = DEFAULT_QUOTE_LINE_ITEMS[businessType ?? 'trades'] ?? DEFAULT_QUOTE_LINE_ITEMS.other;
+  return items.map((item) => ({ ...item }));
+}

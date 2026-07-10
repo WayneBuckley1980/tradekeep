@@ -48,6 +48,7 @@ export async function fetchJobsForCustomer(userId: string, customerId: string): 
     .select('*')
     .eq('user_id', userId)
     .eq('customer_id', customerId)
+    .is('deleted_at', null)
     .order('scheduled_at', { ascending: false });
 
   if (error) throw error;

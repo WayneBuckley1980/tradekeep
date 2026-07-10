@@ -7,9 +7,15 @@ import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 import { QuoteLineItemsForm, useQuoteLineItemsState } from '@/components/QuoteLineItemsForm';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTerminology } from '@/hooks/useTerminology';
 import { fetchCustomer } from '@/lib/customers';
 import { fetchJob, updateJob } from '@/lib/jobs';
-import { fetchQuoteLineItems, saveQuoteLineItems } from '@/lib/quoteItems';
+import {
+  fetchQuoteLineItems,
+  lineItemDraftFromDb,
+  lineItemDraftToSave,
+  saveQuoteLineItems,
+} from '@/lib/quoteItems';
 import { createQuote, fetchQuote, generateReference, quoteHasBeenSent, updateQuote } from '@/lib/quotes';
 import type { Customer } from '@/types/database';
 
@@ -20,7 +26,8 @@ export default function NewQuoteScreen() {
     quoteId?: string;
   }>();
   const navigation = useNavigation();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const terms = useTerminology();
   const isEditMode = Boolean(quoteId);
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -29,11 +36,11 @@ export default function NewQuoteScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [fromJob, setFromJob] = useState(false);
   const [loading, setLoading] = useState(Boolean(quoteId));
-  const { items, setItems, discount, setDiscount } = useQuoteLineItemsState();
+  const { items, setItems, discount, setDiscount } = useQuoteLineItemsState(profile?.business_type);
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: isEditMode ? 'Edit quote' : 'New quote' });
-  }, [navigation, isEditMode]);
+    navigation.setOptions({ title: isEditMode ? `Edit ${terms.quote.toLowerCase()}` : `New ${terms.quote.toLowerCase()}` });
+  }, [navigation, isEditMode, terms.quote]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -56,7 +63,7 @@ export default function NewQuoteScreen() {
           setDiscount(String(Math.abs(Number(discountItem.amount))));
         }
         if (regularItems.length > 0) {
-          setItems(regularItems.map((i) => ({ label: i.label, amount: String(i.amount) })));
+          setItems(regularItems.map(lineItemDraftFromDb));
         }
         setLoading(false);
         return;
@@ -72,7 +79,14 @@ export default function NewQuoteScreen() {
         setTitle(job.title);
         setDescription(job.description ?? '');
         if (job.price != null && Number(job.price) > 0) {
-          setItems([{ label: job.title, amount: String(job.price) }]);
+          setItems([
+            {
+              label: job.title,
+              amount: String(job.price),
+              durationQty: '',
+              durationUnit: terms.defaultDurationUnit,
+            },
+          ]);
         }
         return;
       }
@@ -95,10 +109,15 @@ export default function NewQuoteScreen() {
 
     const lineItems = items
       .filter((i) => i.label.trim())
-      .map((i) => ({ label: i.label.trim(), amount: Number(i.amount) || 0 }));
+      .map(lineItemDraftToSave);
 
     const subtotal = lineItems.reduce((sum, i) => sum + i.amount, 0);
     const total = Math.max(0, subtotal - (Number(discount) || 0));
+
+    const rows = [...lineItems];
+    if (Number(discount) > 0) {
+      rows.push({ label: 'Discount', amount: -Number(discount), durationQty: null, durationUnit: null });
+    }
 
     if (quoteId) {
       const existing = await fetchQuote(user.id, quoteId);
@@ -108,10 +127,6 @@ export default function NewQuoteScreen() {
         amount: total,
       });
 
-      const rows = [...lineItems];
-      if (Number(discount) > 0) {
-        rows.push({ label: 'Discount', amount: -Number(discount) });
-      }
       await saveQuoteLineItems(user.id, quoteId, rows);
 
       if (existing && quoteHasBeenSent(existing)) {
@@ -134,11 +149,7 @@ export default function NewQuoteScreen() {
       sent_at: null,
     });
 
-    if (lineItems.length > 0) {
-      const rows = [...lineItems];
-      if (Number(discount) > 0) {
-        rows.push({ label: 'Discount', amount: -Number(discount) });
-      }
+    if (rows.length > 0) {
       await saveQuoteLineItems(user.id, quote.id, rows);
     }
 
@@ -158,9 +169,9 @@ export default function NewQuoteScreen() {
         <Pressable style={styles.input} onPress={() => !fromJob && !isEditMode && setPickerOpen(true)} disabled={fromJob || isEditMode}>
           <Text style={customerId ? styles.text : styles.placeholder}>{customerName || 'Select client *'}</Text>
         </Pressable>
-        <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Quote title *" placeholderTextColor={colors.textMuted} />
+        <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder={`${terms.quote} title *`} placeholderTextColor={colors.textMuted} />
         <QuoteLineItemsForm items={items} onChange={setItems} discount={discount} onDiscountChange={setDiscount} />
-        <TextInput style={[styles.input, styles.multi]} value={description} onChangeText={setDescription} placeholder="Description" placeholderTextColor={colors.textMuted} multiline />
+        <TextInput style={[styles.input, styles.multi]} value={description} onChangeText={setDescription} placeholder={terms.quoteDescriptionExample} placeholderTextColor={colors.textMuted} multiline />
         <Pressable style={styles.btn} onPress={save}><Text style={styles.btnText}>{isEditMode ? 'Update quote' : 'Save quote'}</Text></Pressable>
       </KeyboardSafeScroll>
       <CustomerPicker userId={user.id} visible={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={(c: Customer) => { setCustomerId(c.id); setCustomerName(c.name); }} />

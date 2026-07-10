@@ -14,6 +14,7 @@ import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'exp
 import { Card } from '@/components/Card';
 import { ContactActions } from '@/components/CustomerRow';
 import { EmptyState } from '@/components/EmptyState';
+import { JobProgressBar } from '@/components/JobProgressBar';
 import { StatusBadge } from '@/components/StatusBadge';
 import { SwipeToDelete } from '@/components/SwipeToDelete';
 import { UrgencyBanner } from '@/components/UrgencyBanner';
@@ -25,6 +26,7 @@ import { deleteInvoice, fetchInvoicesForCustomer } from '@/lib/invoices';
 import { fetchJobsForCustomer } from '@/lib/jobs';
 import { formatMoney } from '@/lib/money';
 import { deleteQuote, fetchQuotesForCustomer } from '@/lib/quotes';
+import { getClientPipelineFocus } from '@/lib/jobPipeline';
 import {
   buildCustomerWorkflow,
   WORKFLOW_STAGES,
@@ -87,6 +89,10 @@ export default function CustomerWorkspaceScreen() {
   const workflow = useMemo(
     () => buildCustomerWorkflow(quotes, jobs, invoices),
     [quotes, jobs, invoices],
+  );
+  const pipelineFocus = useMemo(
+    () => getClientPipelineFocus(jobs, quotes),
+    [jobs, quotes],
   );
   const items = workflow[stage];
 
@@ -170,10 +176,30 @@ export default function CustomerWorkspaceScreen() {
 
       <View style={styles.header}>
         <Text style={styles.name}>
-          {customer.is_favourite ? `⭐ ${customer.name}` : customer.name}
+          {customer.is_favourite ? `${customer.name} (Favourite)` : customer.name}
         </Text>
         <ContactActions customer={customer} />
       </View>
+
+      <Pressable
+        style={styles.pipelineWrap}
+        onPress={() => {
+          if (pipelineFocus.route) {
+            router.push(pipelineFocus.route as never);
+          } else {
+            router.push({ pathname: '/job/new', params: { customerId: customer.id } });
+          }
+        }}
+      >
+        <JobProgressBar currentStatus={pipelineFocus.status} />
+        <Text style={styles.nextAction}>{pipelineFocus.nextAction}</Text>
+        {pipelineFocus.title ? (
+          <Text style={styles.pipelineJobTitle}>{pipelineFocus.title}</Text>
+        ) : null}
+        <Text style={styles.pipelineTap}>
+          {pipelineFocus.route ? 'Tap to continue' : 'Tap to start a new job'}
+        </Text>
+      </Pressable>
 
       <ScrollView
         horizontal
@@ -246,6 +272,27 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, padding: spacing.lg },
   header: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  pipelineWrap: { paddingHorizontal: spacing.md, marginBottom: spacing.sm },
+  nextAction: {
+    ...typography.label,
+    color: colors.textPrimary,
+    fontWeight: '600',
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  pipelineJobTitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  pipelineTap: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
   name: { ...typography.title, color: colors.textPrimary, fontSize: 24, marginBottom: spacing.xs },
   body: { ...typography.body, color: colors.textPrimary },
   link: { ...typography.body, color: colors.textSecondary, marginTop: spacing.md },

@@ -13,6 +13,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { CustomerPicker } from '@/components/CustomerPicker';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
+import { useTerminology } from '@/hooks/useTerminology';
 import { fetchJobTemplates } from '@/lib/templates';
 import type { Customer, JobStatus, JobTemplate } from '@/types/database';
 
@@ -41,6 +42,7 @@ type JobFormProps = {
 const STATUSES: JobStatus[] = ['upcoming', 'in_progress', 'completed', 'cancelled'];
 
 export function JobForm({ userId, initial, onSubmit, submitLabel = 'Save job' }: JobFormProps) {
+  const terms = useTerminology();
   const [templates, setTemplates] = useState<JobTemplate[]>([]);
   const [values, setValues] = useState<JobFormValues>({
     customer_id: initial?.customer_id ?? '',
@@ -78,7 +80,7 @@ export function JobForm({ userId, initial, onSubmit, submitLabel = 'Save job' }:
 
   const handleSubmit = async () => {
     if (!values.customer_id || !values.title.trim()) {
-      Alert.alert('Required', 'Select a client and enter a job title.');
+      Alert.alert('Required', `Select a ${terms.client.toLowerCase()} and enter a ${terms.job.toLowerCase()} title.`);
       return;
     }
     setSaving(true);
@@ -109,11 +111,11 @@ export function JobForm({ userId, initial, onSubmit, submitLabel = 'Save job' }:
 
         <Pressable style={styles.input} onPress={() => setPickerOpen(true)}>
           <Text style={values.customer_id ? styles.inputText : styles.placeholder}>
-            {customerName || 'Select client *'}
+            {customerName || `Select ${terms.client.toLowerCase()} *`}
           </Text>
         </Pressable>
 
-        <TextInput style={styles.input} value={values.title} onChangeText={(title) => setValues((v) => ({ ...v, title }))} placeholder="Job title *" placeholderTextColor={colors.textMuted} />
+        <TextInput style={styles.input} value={values.title} onChangeText={(title) => setValues((v) => ({ ...v, title }))} placeholder={`${terms.job} title *`} placeholderTextColor={colors.textMuted} />
         <TextInput style={[styles.input, styles.multiline]} value={values.description} onChangeText={(description) => setValues((v) => ({ ...v, description }))} placeholder="Description" placeholderTextColor={colors.textMuted} multiline />
 
         <Pressable style={styles.input} onPress={() => setShowDate(true)}>
@@ -128,11 +130,11 @@ export function JobForm({ userId, initial, onSubmit, submitLabel = 'Save job' }:
           </>
         ) : null}
 
-        <TextInput style={styles.input} value={values.duration_minutes} onChangeText={(duration_minutes) => setValues((v) => ({ ...v, duration_minutes }))} placeholder="Duration (minutes)" placeholderTextColor={colors.textMuted} keyboardType="number-pad" />
-        <TextInput style={styles.input} value={values.address_line1} onChangeText={(address_line1) => setValues((v) => ({ ...v, address_line1 }))} placeholder="Job address" placeholderTextColor={colors.textMuted} />
+        <TextInput style={styles.input} value={values.duration_minutes} onChangeText={(duration_minutes) => setValues((v) => ({ ...v, duration_minutes }))} placeholder={`Duration (${terms.defaultDurationUnit})`} placeholderTextColor={colors.textMuted} keyboardType="number-pad" />
+        <TextInput style={styles.input} value={values.address_line1} onChangeText={(address_line1) => setValues((v) => ({ ...v, address_line1 }))} placeholder={terms.jobAddressPlaceholder} placeholderTextColor={colors.textMuted} />
         <TextInput style={styles.input} value={values.price} onChangeText={(price) => setValues((v) => ({ ...v, price }))} placeholder="Price (£)" placeholderTextColor={colors.textMuted} keyboardType="decimal-pad" />
-        <TextInput style={styles.input} value={values.materials} onChangeText={(materials) => setValues((v) => ({ ...v, materials }))} placeholder="Materials" placeholderTextColor={colors.textMuted} />
-        <TextInput style={[styles.input, styles.multiline]} value={values.notes} onChangeText={(notes) => setValues((v) => ({ ...v, notes }))} placeholder="Notes" placeholderTextColor={colors.textMuted} multiline />
+        <TextInput style={styles.input} value={values.materials} onChangeText={(materials) => setValues((v) => ({ ...v, materials }))} placeholder={terms.materials} placeholderTextColor={colors.textMuted} />
+        <TextInput style={[styles.input, styles.multiline]} value={values.notes} onChangeText={(notes) => setValues((v) => ({ ...v, notes }))} placeholder={terms.siteNotes} placeholderTextColor={colors.textMuted} multiline />
 
         <View style={styles.statusRow}>
           {STATUSES.map((status) => (

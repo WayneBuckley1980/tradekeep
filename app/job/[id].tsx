@@ -22,6 +22,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { VoiceNotesSection } from '@/components/VoiceNotesSection';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTerminology } from '@/hooks/useTerminology';
 import {
   deleteAttachment,
   fetchAttachmentsForJob,
@@ -39,6 +40,7 @@ import type { Attachment, Customer, Invoice, Job } from '@/types/database';
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user, profile } = useAuth();
+  const terms = useTerminology();
   const [job, setJob] = useState<Job | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerName, setCustomerName] = useState('');
@@ -290,7 +292,7 @@ export default function JobDetailScreen() {
 
       <Card style={styles.card}>
         {job.description ? <Text style={styles.body}>{job.description}</Text> : null}
-        {job.materials ? <Text style={styles.meta}>Materials: {job.materials}</Text> : null}
+        {job.materials ? <Text style={styles.meta}>{terms.materials}: {job.materials}</Text> : null}
         {job.notes ? <Text style={styles.meta}>Notes: {job.notes}</Text> : null}
         {job.address_line1 ? <Text style={styles.meta}>{[job.address_line1, job.city, job.postcode].filter(Boolean).join(', ')}</Text> : null}
       </Card>
@@ -356,12 +358,12 @@ export default function JobDetailScreen() {
       {isActive ? (
         <>
           <Card style={styles.card}>
-            <Text style={styles.section}>Work completion</Text>
+            <Text style={styles.section}>{terms.workCompleted}</Text>
             <TextInput
               style={[styles.textInput, styles.multi]}
               value={workCompletedNotes}
               onChangeText={setWorkCompletedNotes}
-              placeholder="Work completed notes"
+              placeholder={`${terms.workCompleted} notes`}
               placeholderTextColor={colors.textMuted}
               multiline
             />
@@ -369,7 +371,7 @@ export default function JobDetailScreen() {
               style={[styles.textInput, styles.multi]}
               value={additionalWorks}
               onChangeText={setAdditionalWorks}
-              placeholder="Additional works"
+              placeholder={terms.additionalWorks}
               placeholderTextColor={colors.textMuted}
               multiline
             />
@@ -377,7 +379,7 @@ export default function JobDetailScreen() {
               style={[styles.textInput, styles.multi]}
               value={additionalMaterials}
               onChangeText={setAdditionalMaterials}
-              placeholder="Additional materials"
+              placeholder={terms.additionalMaterials}
               placeholderTextColor={colors.textMuted}
               multiline
             />

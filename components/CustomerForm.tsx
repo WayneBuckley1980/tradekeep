@@ -14,6 +14,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
+import { useTerminology } from '@/hooks/useTerminology';
 import { formatDateOnly, parseDateOnly } from '@/lib/dates';
 import { REMINDER_PRESETS, computeFollowUpDate } from '@/lib/reminders';
 import type { Customer, ReminderType } from '@/types/database';
@@ -65,6 +66,7 @@ function toFormValues(initial?: Partial<Customer>): CustomerFormValues {
 }
 
 export function CustomerForm({ initial, onSubmit, submitLabel = 'Save client' }: CustomerFormProps) {
+  const terms = useTerminology();
   const [values, setValues] = useState<CustomerFormValues>(() => toFormValues(initial));
   const [saving, setSaving] = useState(false);
   const [datePicker, setDatePicker] = useState<'last' | 'follow' | 'next' | null>(null);
@@ -147,7 +149,7 @@ export function CustomerForm({ initial, onSubmit, submitLabel = 'Save client' }:
 
       <View style={styles.field}>
         <Text style={styles.label}>Notes / preferences</Text>
-        <TextInput style={[styles.input, styles.notesInput]} value={values.notes} onChangeText={(notes) => update({ notes })} placeholder="Gate code, preferences…" placeholderTextColor={colors.textMuted} multiline />
+        <TextInput style={[styles.input, styles.notesInput]} value={values.notes} onChangeText={(notes) => update({ notes })} placeholder={terms.clientNotesExample} placeholderTextColor={colors.textMuted} multiline />
       </View>
 
       <View style={styles.switchRow}>

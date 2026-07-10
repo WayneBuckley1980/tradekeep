@@ -5,10 +5,12 @@ import { router } from 'expo-router';
 import { KeyboardSafeScroll } from '@/components/KeyboardSafeScroll';
 import { colors, inputStyle, spacing, typography } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTerminology } from '@/hooks/useTerminology';
 import { createLead } from '@/lib/leads';
 
 export default function NewLeadScreen() {
   const { user } = useAuth();
+  const terms = useTerminology();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -39,7 +41,7 @@ export default function NewLeadScreen() {
       <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Name *" placeholderTextColor={colors.textMuted} />
       <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Phone" placeholderTextColor={colors.textMuted} keyboardType="phone-pad" />
       <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor={colors.textMuted} keyboardType="email-address" autoCapitalize="none" />
-      <TextInput style={styles.input} value={requestedService} onChangeText={setRequestedService} placeholder="Requested service (e.g. Bathroom quote)" placeholderTextColor={colors.textMuted} />
+      <TextInput style={styles.input} value={requestedService} onChangeText={setRequestedService} placeholder={`Requested service (e.g. ${terms.serviceExample})`} placeholderTextColor={colors.textMuted} />
       <TextInput style={[styles.input, styles.multi]} value={notes} onChangeText={setNotes} placeholder="Notes" placeholderTextColor={colors.textMuted} multiline />
       <Pressable style={styles.btn} onPress={save}>
         <Text style={styles.btnText}>Save lead</Text>

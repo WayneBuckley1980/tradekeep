@@ -44,6 +44,7 @@ export type JobNotificationIds = {
   day_before?: string;
 };
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+export type QuoteDurationUnit = 'mins' | 'days' | 'weeks' | 'months';
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
 export type AttachmentKind =
   | 'photo_before'
@@ -332,6 +333,8 @@ export type QuoteLineItem = {
   label: string;
   amount: number;
   sort_order: number;
+  duration_qty: number | null;
+  duration_unit: QuoteDurationUnit | null;
 };
 
 export type CommunicationLog = {
