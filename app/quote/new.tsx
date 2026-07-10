@@ -10,10 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchCustomer } from '@/lib/customers';
 import { fetchJob, updateJob } from '@/lib/jobs';
 import { fetchQuoteLineItems, saveQuoteLineItems } from '@/lib/quoteItems';
-import { createQuote, fetchQuote, generateReference, updateQuote } from '@/lib/quotes';
-import type { Customer, QuoteStatus } from '@/types/database';
-
-const STATUSES: QuoteStatus[] = ['draft', 'sent', 'accepted', 'rejected'];
+import { createQuote, fetchQuote, generateReference, quoteHasBeenSent, updateQuote } from '@/lib/quotes';
+import type { Customer } from '@/types/database';
 
 export default function NewQuoteScreen() {
   const { customerId: paramCustomerId, jobId, quoteId } = useLocalSearchParams<{
@@ -28,7 +26,6 @@ export default function NewQuoteScreen() {
   const [customerName, setCustomerName] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [status, setStatus] = useState<QuoteStatus>('sent');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [fromJob, setFromJob] = useState(false);
   const [loading, setLoading] = useState(Boolean(quoteId));
@@ -50,7 +47,6 @@ export default function NewQuoteScreen() {
         setCustomerName(customer?.name ?? '');
         setTitle(quote.title);
         setDescription(quote.description ?? '');
-        setStatus(quote.status);
         if (quote.job_id) setFromJob(true);
 
         const lineItems = await fetchQuoteLineItems(user.id, quoteId);
@@ -105,11 +101,11 @@ export default function NewQuoteScreen() {
     const total = Math.max(0, subtotal - (Number(discount) || 0));
 
     if (quoteId) {
+      const existing = await fetchQuote(user.id, quoteId);
       await updateQuote(user.id, quoteId, {
         title: title.trim(),
         description: description.trim() || null,
         amount: total,
-        status,
       });
 
       const rows = [...lineItems];
@@ -117,6 +113,11 @@ export default function NewQuoteScreen() {
         rows.push({ label: 'Discount', amount: -Number(discount) });
       }
       await saveQuoteLineItems(user.id, quoteId, rows);
+
+      if (existing && quoteHasBeenSent(existing)) {
+        await updateQuote(user.id, quoteId, { status: 'draft' });
+      }
+
       router.replace(`/quote/${quoteId}`);
       return;
     }
@@ -128,8 +129,9 @@ export default function NewQuoteScreen() {
       title: title.trim(),
       description: description.trim() || null,
       amount: total,
-      status,
+      status: 'draft',
       valid_until: null,
+      sent_at: null,
     });
 
     if (lineItems.length > 0) {
@@ -159,13 +161,6 @@ export default function NewQuoteScreen() {
         <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Quote title *" placeholderTextColor={colors.textMuted} />
         <QuoteLineItemsForm items={items} onChange={setItems} discount={discount} onDiscountChange={setDiscount} />
         <TextInput style={[styles.input, styles.multi]} value={description} onChangeText={setDescription} placeholder="Description" placeholderTextColor={colors.textMuted} multiline />
-        <View style={styles.row}>
-          {STATUSES.map((s) => (
-            <Pressable key={s} style={[styles.chip, status === s && styles.chipActive]} onPress={() => setStatus(s)}>
-              <Text style={styles.chipText}>{s}</Text>
-            </Pressable>
-          ))}
-        </View>
         <Pressable style={styles.btn} onPress={save}><Text style={styles.btnText}>{isEditMode ? 'Update quote' : 'Save quote'}</Text></Pressable>
       </KeyboardSafeScroll>
       <CustomerPicker userId={user.id} visible={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={(c: Customer) => { setCustomerId(c.id); setCustomerName(c.name); }} />
@@ -179,10 +174,6 @@ const styles = StyleSheet.create({
   text: { color: colors.textPrimary, fontSize: 16 },
   placeholder: { color: colors.textMuted, fontSize: 16 },
   multi: { minHeight: 80, textAlignVertical: 'top' },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginVertical: spacing.md },
-  chip: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: 8, padding: spacing.sm },
-  chipActive: { borderColor: colors.textPrimary },
-  chipText: { ...typography.caption, color: colors.textPrimary, textTransform: 'capitalize' },
   btn: { backgroundColor: colors.ctaBackground, borderRadius: 12, padding: spacing.md, alignItems: 'center' },
   btnText: { ...typography.label, color: colors.ctaText, fontWeight: '700' },
 });

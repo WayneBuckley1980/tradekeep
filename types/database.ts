@@ -199,6 +199,7 @@ export type Quote = {
   amount: number;
   status: QuoteStatus;
   valid_until: string | null;
+  sent_at: string | null;
   created_at: string;
   updated_at: string;
 };

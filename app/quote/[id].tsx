@@ -23,7 +23,7 @@ import { fetchInvoiceForQuote } from '@/lib/invoices';
 import { pipelineErrorMessage } from '@/lib/jobPipeline';
 import { acceptQuoteAndActivateJob, sendQuoteByEmail } from '@/lib/jobWorkflow';
 import { formatMoney } from '@/lib/money';
-import { fetchQuote, updateQuote } from '@/lib/quotes';
+import { fetchQuote, quoteSendButtonLabel, quoteStatusLabel, updateQuote } from '@/lib/quotes';
 import type { Customer } from '@/types/database';
 
 export default function QuoteDetailScreen() {
@@ -97,15 +97,17 @@ export default function QuoteDetailScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.title}>{quote.title}</Text>
-          <StatusBadge label={quote.status} status={quote.status} />
+          <StatusBadge label={quoteStatusLabel(quote)} status={quote.status} />
         </View>
         <Text style={styles.meta}>{quote.reference} · {customer?.name}</Text>
         {invoicedRef ? <Text style={styles.meta}>Invoiced as {invoicedRef}</Text> : null}
         <Text style={styles.amount}>{formatMoney(Number(quote.amount))}</Text>
         {quote.description ? <Card style={styles.card}><Text style={styles.body}>{quote.description}</Text></Card> : null}
-        <Pressable style={[styles.btn, busy && styles.btnDisabled]} disabled={busy} onPress={handleSendQuote}>
-          <Text style={styles.btnText}>{quote.status === 'sent' ? 'Re-send quote' : 'Send quote'}</Text>
-        </Pressable>
+        {quote.status !== 'accepted' && quote.status !== 'rejected' ? (
+          <Pressable style={[styles.btn, busy && styles.btnDisabled]} disabled={busy} onPress={handleSendQuote}>
+            <Text style={styles.btnText}>{quoteSendButtonLabel(quote)}</Text>
+          </Pressable>
+        ) : null}
         <Pressable
           style={styles.btnSecondary}
           onPress={() => router.push({ pathname: '/quote/new', params: { quoteId: quote.id } })}

@@ -4,6 +4,21 @@ import type { Quote, QuoteInsert, QuoteUpdate } from '@/types/database';
 
 export { generateQuoteReference as generateReference, generateReference as generateReferenceWithPrefix } from '@/lib/references';
 
+export function quoteHasBeenSent(quote: Pick<Quote, 'status' | 'sent_at'>): boolean {
+  return quote.status === 'sent' || quote.sent_at != null;
+}
+
+export function quoteStatusLabel(quote: Pick<Quote, 'status' | 'sent_at'>): string {
+  if (quote.status === 'accepted') return 'Accepted';
+  if (quote.status === 'rejected') return 'Rejected';
+  if (quote.status === 'sent') return 'Sent';
+  return 'Quote';
+}
+
+export function quoteSendButtonLabel(quote: Pick<Quote, 'status' | 'sent_at'>): string {
+  return quoteHasBeenSent(quote) ? 'Re-send quote' : 'Send quote';
+}
+
 export async function fetchQuotes(userId: string): Promise<Quote[]> {
   const { data, error } = await supabase
     .from('quotes')

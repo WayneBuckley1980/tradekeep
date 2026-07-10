@@ -73,7 +73,10 @@ export async function sendQuoteByEmail(
   const doc = quoteDocumentDetails(quote, lineItems.map((i) => ({ label: i.label, amount: Number(i.amount) })));
   await generateAndEmailDocument(profile, client, doc);
 
-  const updated = await updateQuote(userId, quote.id, { status: 'sent' });
+  const updated = await updateQuote(userId, quote.id, {
+    status: 'sent',
+    sent_at: quote.sent_at ?? new Date().toISOString(),
+  });
 
   if (quote.job_id) {
     await updateJobPipeline(userId, quote.job_id, 'quoted');
@@ -88,6 +91,15 @@ export type AcceptQuoteOptions = {
   customer: Customer;
 };
 
+async function advanceJobToActive(userId: string, jobId: string, pipelineStatus: Job['pipeline_status']): Promise<void> {
+  if (pipelineStatus === 'lead') {
+    await updateJobPipeline(userId, jobId, 'quoted');
+    await updateJobPipeline(userId, jobId, 'active');
+  } else if (pipelineStatus === 'quoted') {
+    await updateJobPipeline(userId, jobId, 'active');
+  }
+}
+
 export async function acceptQuoteAndActivateJob(
   userId: string,
   quote: Quote,
@@ -96,9 +108,8 @@ export async function acceptQuoteAndActivateJob(
   const { startAt, addToCalendar, customer } = options;
   await updateQuote(userId, quote.id, { status: 'accepted' });
 
-  const jobPayload = {
+  const jobFields = {
     status: 'upcoming' as const,
-    pipeline_status: 'active' as const,
     price: quote.amount,
     start_at: startAt,
     scheduled_at: startAt,
@@ -107,10 +118,9 @@ export async function acceptQuoteAndActivateJob(
   let job: Job;
   if (quote.job_id) {
     const existing = await fetchJob(userId, quote.job_id);
-    if (existing?.pipeline_status === 'lead') {
-      await updateJobPipeline(userId, quote.job_id, 'quoted');
-    }
-    job = await updateJob(userId, quote.job_id, jobPayload);
+    if (!existing) throw new Error('Job not found');
+    await advanceJobToActive(userId, quote.job_id, existing.pipeline_status);
+    job = await updateJob(userId, quote.job_id, jobFields);
   } else {
     job = await createJob(userId, {
       customer_id: quote.customer_id,
@@ -142,17 +152,25 @@ export async function acceptQuoteAndActivateJob(
   }
 
   if (addToCalendar) {
-    await addJobEventToCalendar({
-      title: job.title,
-      startDate: new Date(startAt),
-      location: [customer.address_line1, customer.city].filter(Boolean).join(', '),
-      notes: 'TradeKeepCRM job start',
-    });
+    try {
+      await addJobEventToCalendar({
+        title: job.title,
+        startDate: new Date(startAt),
+        location: [customer.address_line1, customer.city].filter(Boolean).join(', '),
+        notes: 'TradeKeepCRM job start',
+      });
+    } catch (error) {
+      console.error('Failed to add job to calendar', error);
+    }
   }
 
-  await cancelJobStartReminders(job.job_notification_ids);
-  const job_notification_ids = await scheduleJobStartReminders(job.id, job.title, startAt);
-  job = await updateJob(userId, job.id, { job_notification_ids });
+  try {
+    await cancelJobStartReminders(job.job_notification_ids);
+    const job_notification_ids = await scheduleJobStartReminders(job.id, job.title, startAt);
+    job = await updateJob(userId, job.id, { job_notification_ids });
+  } catch (error) {
+    console.error('Failed to schedule job start reminders', error);
+  }
 
   return job;
 }
@@ -187,10 +205,8 @@ export async function raiseInvoiceForJob(
     status: invoicePayload.status ?? 'sent',
   });
 
-  const updatedJob = await updateJob(userId, currentJob.id, {
-    status: 'in_progress',
-    pipeline_status: 'invoiced',
-  });
+  const updatedJob = await updateJob(userId, currentJob.id, { status: 'in_progress' });
+  await updateJobPipeline(userId, currentJob.id, 'invoiced');
   await syncLastAppointmentFromJob(userId, job.customer_id, updatedJob);
   await scheduleAfterJobReminder(userId, job.customer_id, updatedJob.scheduled_at);
 
